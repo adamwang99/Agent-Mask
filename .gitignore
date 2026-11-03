@@ -1,0 +1,4 @@
+packaging/out/
+/agent-mask
+/agent-mask.exe
+*.test

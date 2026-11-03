@@ -1,0 +1,391 @@
+[
+ {
+  "line": "mail a.b@ex.co now",
+  "folded": "mail a.b@ex.co now",
+  "matches": [
+   {
+    "kind": "email",
+    "start": 5,
+    "end": 14
+   }
+  ]
+ },
+ {
+  "line": "k=sk-ant-abcdefghijklmnopqrstuvwx",
+  "folded": "k=sk-ant-abcdefghijklmnopqrstuvwx",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 2,
+    "end": 33
+   }
+  ]
+ },
+ {
+  "line": "eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0NTY.abcdefghijk",
+  "folded": "eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0NTY.abcdefghijk",
+  "matches": [
+   {
+    "kind": "jwt",
+    "start": 0,
+    "end": 48
+   }
+  ]
+ },
+ {
+  "line": "4111 1111 1111 1111 and 4111 1111 1111 1112",
+  "folded": "4111 1111 1111 1111 and 4111 1111 1111 1112",
+  "matches": [
+   {
+    "kind": "credit-card",
+    "start": 0,
+    "end": 19
+   }
+  ]
+ },
+ {
+  "line": "call 0912 345 678 ok, or +84 912 345 678, or +1 415 555 0132",
+  "folded": "ca11 0912 345 678 0k, or +84 912 345 678, or +1 415 555 0132",
+  "matches": [
+   {
+    "kind": "phone",
+    "start": 5,
+    "end": 17
+   },
+   {
+    "kind": "phone",
+    "start": 25,
+    "end": 40
+   },
+   {
+    "kind": "phone",
+    "start": 45,
+    "end": 60
+   }
+  ]
+ },
+ {
+  "line": "order 1234567890123 shipped",
+  "folded": "order 1234567890123 5hipped",
+  "matches": []
+ },
+ {
+  "line": "password: hunter2xyz",
+  "folded": "password: hunter2xyz",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 10,
+    "end": 20
+   }
+  ]
+ },
+ {
+  "line": "Mật khẩu: Tr0ngDong2026x",
+  "folded": "Mật khẩu: Tr0ngDong2026x",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 10,
+    "end": 24
+   }
+  ]
+ },
+ {
+  "line": "Mat khau: TrOngDong2026x",
+  "folded": "Mat khau: TrOngDong2026x",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 10,
+    "end": 24
+   }
+  ]
+ },
+ {
+  "line": "Mã OTP: 482913 và mã PIN: 1234",
+  "folded": "Mã OTP: 482913 và mã PIN: 1234",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 8,
+    "end": 14
+   },
+   {
+    "kind": "secret-assignment",
+    "start": 26,
+    "end": 30
+   }
+  ]
+ },
+ {
+  "line": "Khóa bí mật = abcdEFGH1234",
+  "folded": "Khóa bí mật = abcdEFGH1234",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 14,
+    "end": 26
+   }
+  ]
+ },
+ {
+  "line": "Author: Nguyen Van A",
+  "folded": "Author: Nguyen Van A",
+  "matches": []
+ },
+ {
+  "line": "xpassword: nope1234",
+  "folded": "xpassword: nope1234",
+  "matches": []
+ },
+ {
+  "line": "APT_KEY=sk-proj-AbC123x¥2789QuErTy456Ui0p",
+  "folded": "APT_KEY=sk-proj-AbC123xY2789QuErTy456Ui0p",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 0,
+    "end": 41
+   }
+  ]
+ },
+ {
+  "line": "DB_PASSWORD=hunter2xyz MONKEY=banana",
+  "folded": "DB_PASSWORD=hunter2xyz MONKEY=banana",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 12,
+    "end": 22
+   }
+  ]
+ },
+ {
+  "line": "Contact: jane.doegexample.com",
+  "folded": "Contact: jane.doegexample.com",
+  "matches": [
+   {
+    "kind": "email",
+    "start": 9,
+    "end": 29
+   }
+  ]
+ },
+ {
+  "line": "see staging.example.com and import logging.info",
+  "folded": "see staging.example.com and import logging.info",
+  "matches": []
+ },
+ {
+  "line": "Card 4111 1l11 1111 1lll",
+  "folded": "Card 4111 1111 1111 1111",
+  "matches": [
+   {
+    "kind": "credit-card",
+    "start": 5,
+    "end": 24
+   }
+  ]
+ },
+ {
+  "line": "So dien thoai: 0912 34S 678",
+  "folded": "So dien thoai: 0912 345 678",
+  "matches": [
+   {
+    "kind": "phone",
+    "start": 15,
+    "end": 27
+   }
+  ]
+ },
+ {
+  "line": "Contact Jjane.. doe@examp Le. com",
+  "folded": "Contact Jjane.. doe@examp Le. com",
+  "matches": [
+   {
+    "kind": "email",
+    "start": 0,
+    "end": 33
+   }
+  ]
+ },
+ {
+  "line": "DATABASE_URL=postgres://app:S3cr3tPassw0rd@db.internal:5432/prod",
+  "folded": "DATABASE_URL=postgres://app:S3cr3tPassw0rd@db.internal:5432/prod",
+  "matches": [
+   {
+    "kind": "url-credentials",
+    "start": 28,
+    "end": 54
+   }
+  ]
+ },
+ {
+  "line": "STRIPE_KEY=@STRIPE_TEST_KEY@",
+  "folded": "STRIPE_KEY=@STRIPE_TEST_KEY@",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 0,
+    "end": 43
+   }
+  ]
+ },
+ {
+  "line": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345",
+  "folded": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 15,
+    "end": 54
+   }
+  ]
+ },
+ {
+  "line": "AKIAIOSFODNN7EXAMPLE and AIzaSyA1234567890abcdefghijklmnopqrstu",
+  "folded": "AKIAIOSFODNN7EXAMPLE and AIzaSyA1234567890abcdefghijklmnopqrstu",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 0,
+    "end": 20
+   },
+   {
+    "kind": "high-entropy",
+    "start": 25,
+    "end": 63
+   }
+  ]
+ },
+ {
+  "line": "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ",
+  "folded": "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 0,
+    "end": 67
+   }
+  ]
+ },
+ {
+  "line": "-----BEGIN RSA PRIVATE KEY-----",
+  "folded": "-----BEGIN RSA PRIVATE KEY-----",
+  "matches": [
+   {
+    "kind": "private-key",
+    "start": 0,
+    "end": 31
+   }
+  ]
+ },
+ {
+  "line": "token = 8f14e45fceea167a5a36dedd4bea2543x9",
+  "folded": "token = 8f14e45fceea167a5a36dedd4bea2543x9",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 8,
+    "end": 42
+   }
+  ]
+ },
+ {
+  "line": "a-long-hyphenated-slug-for-a-blog-post-title",
+  "folded": "a-long-hyphenated-slug-for-a-blog-post-title",
+  "matches": []
+ },
+ {
+  "line": "Gửi tới nguyễn.văn@công-ty.vn hoặc lien.he@fpt.com.vn",
+  "folded": "Gửi tới nguyễn.văn@công-ty.vn hoặc lien.he@fpt.com.vn",
+  "matches": [
+   {
+    "kind": "email",
+    "start": 33,
+    "end": 53
+   }
+  ]
+ },
+ {
+  "line": "xoxb-1234567890-abcdefghij npm_abcdefghijklmnopqrstuvwxyz0123456789",
+  "folded": "xoxb-1234567890-abcdefghij npm_abcdefghijklmnopqrstuvwxy20123456789",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 0,
+    "end": 26
+   },
+   {
+    "kind": "api-key",
+    "start": 27,
+    "end": 67
+   }
+  ]
+ },
+ {
+  "line": "DB_PASSWORD rOngDong2026x",
+  "folded": "DB_PASSWORD rOngDong2026x",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 12,
+    "end": 25
+   }
+  ]
+ },
+ {
+  "line": "STRIPE_KEY @STRIPE_TEST_KEY@",
+  "folded": "STRIPE_KEY @STRIPE_TEST_KEY@",
+  "matches": [
+   {
+    "kind": "api-key",
+    "start": 11,
+    "end": 43
+   }
+  ]
+ },
+ {
+  "line": "Reset your PASSWORD here",
+  "folded": "Reset your PASSWORD here",
+  "matches": []
+ },
+ {
+  "line": "MY_TOKEN abcdefgh",
+  "folded": "MY_TOKEN abcdefgh",
+  "matches": []
+ },
+ {
+  "line": "the db_password field is required",
+  "folded": "the db_password field is required",
+  "matches": []
+ },
+ {
+  "line": "DB_PASSWORD=T rOngDong2026x",
+  "folded": "DB_PASSWORD=T rOngDong2026x",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 12,
+    "end": 27
+   }
+  ]
+ },
+ {
+  "line": "password: is required",
+  "folded": "password: is required",
+  "matches": []
+ },
+ {
+  "line": "Mật khẩu: T r0ngDong2026",
+  "folded": "Mật khẩu: T r0ngDong2026",
+  "matches": [
+   {
+    "kind": "secret-assignment",
+    "start": 10,
+    "end": 24
+   }
+  ]
+ }
+]

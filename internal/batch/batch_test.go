@@ -1,0 +1,88 @@
+package batch
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func need(t *testing.T) {
+	for _, c := range []string{"ffmpeg", "ffprobe", "tesseract"} {
+		if _, err := exec.LookPath(c); err != nil {
+			t.Skip("needs " + c)
+		}
+	}
+}
+
+func picture(t *testing.T, path, text string) {
+	t.Helper()
+	vf := "drawtext=text='" + text + "':fontsize=34:x=40:y=60:fontcolor=black,drawtext=text='Settings page':fontsize=34:x=40:y=180:fontcolor=black"
+	if b, err := exec.Command("ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=white:s=900x300", "-vf", vf, "-frames:v", "1", path).CombinedOutput(); err != nil {
+		t.Fatal(err, string(b))
+	}
+}
+
+func TestFolderJob(t *testing.T) {
+	need(t)
+	in, out := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(in, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	picture(t, filepath.Join(in, "a.png"), "Contact jane.doe@example.com")
+	picture(t, filepath.Join(in, "sub", "b.jpg"), "Call 0912 345 678")
+	os.WriteFile(filepath.Join(in, "notes.txt"), []byte("not a picture"), 0o644)
+
+	m := NewManager()
+	j, err := m.Start(in, out, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.Counts.Total != 2 {
+		t.Fatalf("%d files, want 2", j.Counts.Total)
+	}
+	j, err = m.Wait(j.ID, 2*time.Minute)
+	if err != nil || j.Status != "done" {
+		t.Fatalf("%v %+v", err, j)
+	}
+	for _, f := range j.Files {
+		if f.Status != "verified" || f.Hidden == 0 {
+			t.Fatalf("%+v", f)
+		}
+	}
+	for _, f := range []string{"a.png", "sub/b.jpg", "report.json", "report.md"} {
+		if _, err := os.Stat(filepath.Join(out, f)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The report never holds the hidden text.
+	for _, f := range []string{"report.json", "report.md"} {
+		b, _ := os.ReadFile(filepath.Join(out, f))
+		for _, secret := range []string{"jane.doe", "345 678"} {
+			if strings.Contains(string(b), secret) {
+				t.Fatalf("%s holds %q", f, secret)
+			}
+		}
+	}
+	// A second run skips what is unchanged.
+	j2, _ := m.Start(in, out, Options{})
+	j2, _ = m.Wait(j2.ID, time.Minute)
+	if j2.Counts.Skipped != 2 {
+		t.Fatalf("second run: %+v", j2.Counts)
+	}
+}
+
+func TestCheckRefusesNestedFolders(t *testing.T) {
+	in := t.TempDir()
+	if _, _, err := Check(in, filepath.Join(in, "out")); err == nil {
+		t.Fatal("output inside input accepted")
+	}
+	if _, _, err := Check(in, in); err == nil {
+		t.Fatal("same folder accepted")
+	}
+	if _, _, err := Check(filepath.Join(in, "nope"), t.TempDir()); err == nil {
+		t.Fatal("missing input accepted")
+	}
+}
