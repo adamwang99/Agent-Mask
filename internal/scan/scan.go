@@ -216,6 +216,16 @@ func Video(video string, o Options) (*Result, error) {
 			j.dets = append(j.dets, plan.DetectInRows(ocr.BuildRows(words, 0, 0), float64(zoom*w), float64(zoom*h), o.Kinds)...)
 		}
 	}
+	// The scroll is measured meanwhile, on its own decode: it needs no OCR result.
+	type motionResult struct {
+		m   *Motion
+		err error
+	}
+	motionDone := make(chan motionResult, 1)
+	go func() {
+		m, err := MeasureMotion(video, cropFilter, srcW, srcH, vfps)
+		motionDone <- motionResult{m, err}
+	}()
 	r := bufio.NewReaderSize(stdout, 1<<20)
 	for n := 0; ; n++ {
 		gray := make([]byte, w*h)
@@ -253,7 +263,8 @@ func Video(video string, o Options) (*Result, error) {
 
 	// The scroll on every frame; then the parts of the page that went by between two reads
 	// (a jump, a fast scroll) are read too.
-	motion, merr := MeasureMotion(video, cropFilter, srcW, srcH, vfps)
+	mres := <-motionDone
+	motion, merr := mres.m, mres.err
 	var motionWarn string
 	if merr != nil {
 		motionWarn = "motion not measured, masks follow the reads only: " + merr.Error()
@@ -323,7 +334,7 @@ func Video(video string, o Options) (*Result, error) {
 		}
 	}
 	if motion != nil {
-		plan.FollowScroll(linked, motion.Shift, motion.Scene, motion.FPS)
+		linked = plan.FollowScroll(linked, motion.Shift, motion.Scene, motion.FPS)
 	}
 	sort.Float64s(times)
 	res.Regions = plan.FinalizeTracks(linked, times, info.DurationSec)

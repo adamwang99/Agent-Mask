@@ -278,6 +278,12 @@ func (m *Manager) Cancel(id string) error {
 		return nil
 	}
 	j.canceled = true
+	// Not started yet (another job is running): it ends now, it will never start.
+	if j.Status == "queued" {
+		now := time.Now().UTC()
+		j.Status, j.Finished = "canceled", &now
+		m.emit(j, Event{Type: "done"})
+	}
 	return nil
 }
 
@@ -357,6 +363,15 @@ func (m *Manager) emit(j *Job, e Event) {
 
 func (m *Manager) worker() {
 	for j := range m.queue {
+		m.mu.Lock()
+		skip := j.Status == "canceled"
+		m.mu.Unlock()
+		if skip {
+			if m.OnEnd != nil {
+				m.OnEnd(j.copy())
+			}
+			continue
+		}
 		m.run(j)
 	}
 }

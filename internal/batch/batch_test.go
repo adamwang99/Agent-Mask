@@ -86,3 +86,30 @@ func TestCheckRefusesNestedFolders(t *testing.T) {
 		t.Fatal("missing input accepted")
 	}
 }
+
+func TestCancelQueuedJob(t *testing.T) {
+	need(t)
+	in := t.TempDir()
+	picture(t, filepath.Join(in, "a.png"), "Contact jane.doe@example.com")
+	m := NewManager()
+	first, err := m.Start(in, t.TempDir(), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := m.Start(in, t.TempDir(), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Cancel(second.ID); err != nil {
+		t.Fatal(err)
+	}
+	if j, _ := m.Get(second.ID); j.Status != "canceled" {
+		t.Fatalf("queued job after cancel: %s", j.Status)
+	}
+	if j, _ := m.Wait(first.ID, time.Minute); j.Status != "done" {
+		t.Fatalf("first job: %s", j.Status)
+	}
+	if j, _ := m.Wait(second.ID, time.Second); j.Status != "canceled" || j.Counts.Done != 0 {
+		t.Fatalf("second job: %+v", j)
+	}
+}

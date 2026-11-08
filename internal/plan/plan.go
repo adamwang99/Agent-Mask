@@ -387,65 +387,81 @@ func (tr *Track) BoxAt(T float64) (box Box, bg *float64, ok bool) {
 // scrolled at each frame (a share of the height), scene where the picture changed beyond a
 // scroll. A secret read at a few frames sits at one place on the page: from there its box is
 // known on every frame of the scene, including the frames between two reads, a jump, and the
-// moment it enters or leaves at an edge. Secrets that stay put while the page scrolls (in a
-// header or a sidebar) are left as they are.
-func FollowScroll(tracks []*Track, shift []float64, scene []int, fps float64) {
+// moment it enters or leaves at an edge. The same text can be at several places on one page
+// (an email in a header and again further down): each place becomes its own track, so none of
+// them borrows another's position. Secrets that stay put while the page scrolls (in a header
+// or a sidebar) keep their reads as they are.
+func FollowScroll(tracks []*Track, shift []float64, scene []int, fps float64) []*Track {
 	frameAt := func(t float64) int { return max(0, min(len(shift)-1, int(math.Round(t*fps)))) }
-	for _, tr := range tracks {
-		byScene := map[int][]Point{}
-		for _, p := range tr.Points {
-			f := frameAt(p.T)
-			byScene[scene[f]] = append(byScene[scene[f]], p)
-		}
-		var added []Point
-		for sc, pts := range byScene {
-			// Where it is on the page, from each read; and whether it moved with the page.
-			var pageY0, pageY1, screenY []float64
-			minS, maxS := math.Inf(1), math.Inf(-1)
-			for _, p := range pts {
-				s := shift[frameAt(p.T)]
-				pageY0 = append(pageY0, p.Box.Y0+s)
-				pageY1 = append(pageY1, p.Box.Y1+s)
-				screenY = append(screenY, p.Box.Y0)
-				minS, maxS = math.Min(minS, s), math.Max(maxS, s)
-			}
-			if maxS-minS > 0.02 && spread(screenY) < 0.005 {
-				continue // it did not move while the page did: a fixed part of the screen
-			}
-			// Its place on the page: most reads agree; one odd read (a frame caught mid-jump)
-			// must not cost the others.
-			y0, y1 := median(pageY0), median(pageY1)
-			agree := 0
-			for _, v := range pageY0 {
-				if math.Abs(v-y0) <= 0.02 {
-					agree++
-				}
-			}
-			if agree*10 < len(pageY0)*6 {
-				continue // it does not keep one place on the page: leave it to the reads
-			}
-			box := pts[0].Box
-			for _, p := range pts[1:] {
-				box.X0, box.X1 = math.Min(box.X0, p.Box.X0), math.Max(box.X1, p.Box.X1)
-			}
-			pad := 0.004 + 0.1*(y1-y0)
-			bg := pts[0].Bg
-			for f := range shift {
-				if scene[f] != sc {
-					continue
-				}
-				top, bottom := y0-shift[f]-pad, y1-shift[f]+pad
-				if bottom < 0 || top > 1 {
-					added = append(added, Point{T: float64(f) / fps, Off: true, Propagated: true})
-					continue
-				}
-				b := Box{X0: box.X0, Y0: math.Max(0, top), X1: box.X1, Y1: math.Min(1, bottom)}
-				added = append(added, Point{T: float64(f) / fps, Box: b, Bg: bg, Propagated: true})
-			}
-		}
-		tr.Points = append(tr.Points, added...)
-		sort.SliceStable(tr.Points, func(i, j int) bool { return tr.Points[i].T < tr.Points[j].T })
+	type read struct {
+		p      Point
+		s, py0 float64
 	}
+	var out []*Track
+	for _, tr := range tracks {
+		byScene := map[int][]read{}
+		var scenes []int
+		for _, p := range tr.Points {
+			if p.Off {
+				continue
+			}
+			f := frameAt(p.T)
+			sc := scene[f]
+			if _, ok := byScene[sc]; !ok {
+				scenes = append(scenes, sc)
+			}
+			byScene[sc] = append(byScene[sc], read{p, shift[f], p.Box.Y0 + shift[f]})
+		}
+		sort.Ints(scenes)
+		for _, sc := range scenes {
+			reads := byScene[sc]
+			sort.SliceStable(reads, func(i, j int) bool { return reads[i].py0 < reads[j].py0 })
+			// Places on the page: reads within 0.02 of the height of each other.
+			var places [][]read
+			for i, r := range reads {
+				if i == 0 || r.py0-reads[i-1].py0 > 0.02 {
+					places = append(places, nil)
+				}
+				places[len(places)-1] = append(places[len(places)-1], r)
+			}
+			for _, place := range places {
+				nt := &Track{Kind: tr.Kind, Text: tr.Text, Preview: tr.Preview}
+				var pageY0, pageY1, screenY []float64
+				minS, maxS := math.Inf(1), math.Inf(-1)
+				box := place[0].p.Box
+				for _, r := range place {
+					nt.Points = append(nt.Points, r.p)
+					pageY0 = append(pageY0, r.py0)
+					pageY1 = append(pageY1, r.p.Box.Y1+r.s)
+					screenY = append(screenY, r.p.Box.Y0)
+					minS, maxS = math.Min(minS, r.s), math.Max(maxS, r.s)
+					box.X0, box.X1 = math.Min(box.X0, r.p.Box.X0), math.Max(box.X1, r.p.Box.X1)
+				}
+				out = append(out, nt)
+				if maxS-minS > 0.02 && spread(screenY) < 0.005 {
+					continue // it did not move while the page did: a fixed part of the screen
+				}
+				y0, y1 := median(pageY0), median(pageY1)
+				pad := 0.004 + 0.1*(y1-y0)
+				bg := place[0].p.Bg
+				for f := range shift {
+					if scene[f] != sc {
+						continue
+					}
+					T := float64(f) / fps
+					top, bottom := y0-shift[f]-pad, y1-shift[f]+pad
+					if bottom < 0 || top > 1 {
+						nt.Points = append(nt.Points, Point{T: T, Off: true, Propagated: true})
+						continue
+					}
+					b := Box{X0: box.X0, Y0: math.Max(0, top), X1: box.X1, Y1: math.Min(1, bottom)}
+					nt.Points = append(nt.Points, Point{T: T, Box: b, Bg: bg, Propagated: true})
+				}
+				sort.SliceStable(nt.Points, func(i, j int) bool { return nt.Points[i].T < nt.Points[j].T })
+			}
+		}
+	}
+	return out
 }
 
 func spread(v []float64) float64 {

@@ -113,8 +113,7 @@ func TestFollowScrollCoversBetweenReadsAndEdges(t *testing.T) {
 		{T: 0.5, Box: Box{X0: 0.1, Y0: 0.5, X1: 0.6, Y1: 0.53}},
 		{T: 1.0, Box: Box{X0: 0.1, Y0: 0.2, X1: 0.6, Y1: 0.23}},
 	}}
-	FollowScroll([]*Track{tr}, shift, scene, 30)
-	tracks := FinalizeTracks([]*Track{tr}, []float64{0.5, 1.0}, 2)
+	tracks := FinalizeTracks(FollowScroll([]*Track{tr}, shift, scene, 30), []float64{0.5, 1.0}, 2)
 	tr = tracks[0]
 	for f := 0; f < 60; f++ {
 		T := float64(f) / 30
@@ -128,5 +127,43 @@ func TestFollowScrollCoversBetweenReadsAndEdges(t *testing.T) {
 	// Scrolled out of view: nothing drawn.
 	if _, _, ok := tr.BoxAt(59.0 / 30); ok {
 		t.Fatal("masked after it left the screen")
+	}
+}
+
+// The same text at two places on the page: each place is followed on its own.
+func TestFollowScrollTwoPlaces(t *testing.T) {
+	shift := make([]float64, 60)
+	scene := make([]int, 60)
+	for f := range shift {
+		shift[f] = 0.01 * float64(f)
+	}
+	// Page places 0.5 and 0.9; read three times at 0.5, once at 0.9 (frame 30: screen 0.6).
+	tr := &Track{Kind: "email", Points: []Point{
+		{T: 0, Box: Box{X0: 0.1, Y0: 0.5, X1: 0.5, Y1: 0.53}},
+		{T: 0.5, Box: Box{X0: 0.1, Y0: 0.35, X1: 0.5, Y1: 0.38}},
+		{T: 1.0, Box: Box{X0: 0.1, Y0: 0.2, X1: 0.5, Y1: 0.23}},
+		{T: 1.0, Box: Box{X0: 0.1, Y0: 0.6, X1: 0.5, Y1: 0.63}},
+	}}
+	tracks := FinalizeTracks(FollowScroll([]*Track{tr}, shift, scene, 30), []float64{0, 0.5, 1}, 2)
+	if len(tracks) != 2 {
+		t.Fatalf("%d tracks, want 2", len(tracks))
+	}
+	for f := 0; f < 60; f++ {
+		T := float64(f) / 30
+		for _, page := range []float64{0.5, 0.9} {
+			y := page - shift[f]
+			if y < 0 || y+0.03 > 1 {
+				continue
+			}
+			covered := false
+			for _, tr := range tracks {
+				if b, _, ok := tr.BoxAt(T); ok && b.Y0 <= y+1e-6 && b.Y1 >= y+0.03-1e-6 {
+					covered = true
+				}
+			}
+			if !covered {
+				t.Fatalf("frame %d: text at %.2f not covered", f, y)
+			}
+		}
 	}
 }

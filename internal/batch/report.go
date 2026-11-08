@@ -25,9 +25,18 @@ func writeReports(j *Job) error {
 // Summary: one line.
 func Summary(j *Job) string {
 	c := j.Counts
+	switch j.Status {
+	case "queued":
+		return fmt.Sprintf("%d file(s) queued, waiting for the job before it", c.Total)
+	case "running":
+		return fmt.Sprintf("%d of %d file(s) done: %d verified, %d to review, %d failed, %d skipped", c.Done, c.Total, c.Verified, c.Review, c.Failed, c.Skipped)
+	}
 	s := fmt.Sprintf("%d file(s): %d verified, %d to review, %d failed, %d skipped (unchanged)", c.Total, c.Verified, c.Review, c.Failed, c.Skipped)
 	if j.Status == "canceled" {
 		s += fmt.Sprintf("; canceled after %d", c.Done)
+		if j.Started == nil {
+			s = fmt.Sprintf("%d file(s): canceled before it started", c.Total)
+		}
 	}
 	return s
 }
