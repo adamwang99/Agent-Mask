@@ -3,6 +3,7 @@ package redact
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/adamwang99/agent-mask/internal/media"
 	"github.com/adamwang99/agent-mask/internal/plan"
@@ -24,6 +25,14 @@ type Result struct {
 	Verified bool           `json:"verified"`
 	Reasons  []string       `json:"reasons,omitempty"`
 	Warnings []string       `json:"warnings,omitempty"`
+	Regions  []Region       `json:"regions,omitempty"`
+}
+
+// Region: what kind of thing was hidden, and when it was on screen. Never its text.
+type Region struct {
+	Kind     string  `json:"kind"`
+	StartSec float64 `json:"startSec"`
+	EndSec   float64 `json:"endSec"`
 }
 
 // BoxesAt: the boxes to hide at time T, in their two groups.
@@ -83,6 +92,7 @@ func Video(in, out string, o Options) (*Result, error) {
 			r.Kinds = map[string]int{}
 		}
 		r.Kinds[t.Kind]++
+		r.Regions = append(r.Regions, Region{Kind: t.Kind, StartSec: math.Round(t.StartSec*100) / 100, EndSec: math.Round(t.EndSec*100) / 100})
 	}
 	r.Verified, r.Reasons = Verdict(check)
 	// Everything readable was sensitive and is now hidden: the first scan proved the OCR works

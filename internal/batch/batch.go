@@ -43,17 +43,18 @@ const ReviewDir = "_review"
 
 // FileReport is one file's result. It never holds the hidden text, only its kinds.
 type FileReport struct {
-	Input    string         `json:"input"`
-	Output   string         `json:"output,omitempty"`
-	Type     string         `json:"type"`   // video, image
-	Status   string         `json:"status"` // pending, running, verified, review, failed, skipped
-	Found    int            `json:"found"`
-	Hidden   int            `json:"hidden"`
-	Kinds    map[string]int `json:"kinds,omitempty"`
-	Verified bool           `json:"verified"`
-	Reasons  []string       `json:"reasons,omitempty"`
-	Error    string         `json:"error,omitempty"`
-	Seconds  float64        `json:"seconds"`
+	Input    string          `json:"input"`
+	Output   string          `json:"output,omitempty"`
+	Type     string          `json:"type"`   // video, image
+	Status   string          `json:"status"` // pending, running, verified, review, failed, skipped
+	Found    int             `json:"found"`
+	Hidden   int             `json:"hidden"`
+	Kinds    map[string]int  `json:"kinds,omitempty"`
+	Regions  []redact.Region `json:"regions,omitempty"` // when each hidden thing was on screen (videos)
+	Verified bool            `json:"verified"`
+	Reasons  []string        `json:"reasons,omitempty"`
+	Error    string          `json:"error,omitempty"`
+	Seconds  float64         `json:"seconds"`
 	rel      string
 }
 
@@ -455,7 +456,7 @@ func (m *Manager) one(j *Job, f *FileReport, idx *index) *FileReport {
 		r.Status, r.Error = "failed", err.Error()
 		return r
 	}
-	r.Found, r.Hidden, r.Kinds, r.Verified, r.Reasons = res.Found, res.Hidden, res.Kinds, res.Verified, res.Reasons
+	r.Found, r.Hidden, r.Kinds, r.Verified, r.Reasons, r.Regions = res.Found, res.Hidden, res.Kinds, res.Verified, res.Reasons, res.Regions
 	dest := outRel
 	r.Status = "verified"
 	if !r.Verified {
@@ -481,7 +482,7 @@ func redactVideo(in, out string, o Options) (*FileReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FileReport{Found: res.Found, Hidden: res.Hidden, Verified: res.Verified, Reasons: res.Reasons, Kinds: res.Kinds}, nil
+	return &FileReport{Found: res.Found, Hidden: res.Hidden, Verified: res.Verified, Reasons: res.Reasons, Kinds: res.Kinds, Regions: res.Regions}, nil
 }
 
 func kindsOf(r *scan.Result) map[string]int {

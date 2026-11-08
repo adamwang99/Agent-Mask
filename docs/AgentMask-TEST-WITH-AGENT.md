@@ -6,7 +6,7 @@ macOS hoặc Linux nếu có. Chỉ dùng **dữ liệu giả**: không đưa b�
 ## Chuẩn bị (người làm, trước khi giao cho agent)
 
 1. Cài Agent Mask, chọn một trong hai cách:
-   - Windows: chạy `AgentMask-Setup-0.1.0.exe`. Bộ cài chưa ký số, SmartScreen có thể hỏi: bấm **More info → Run anyway**. Ở trang cuối, để tick "Check and install ffmpeg and Tesseract" và trả lời Y.
+   - Windows: chạy `AgentMask-Setup-0.1.1.exe`. Bộ cài chưa ký số, SmartScreen có thể hỏi: bấm **More info → Run anyway**. Ở trang cuối, để tick "Check and install ffmpeg and Tesseract" và trả lời Y.
    - Có Go 1.24+: `go install github.com/adamwang99/agent-mask/cmd/agent-mask@latest`, rồi tự cài ffmpeg và Tesseract (Windows: `winget install Gyan.FFmpeg` và `winget install UB-Mannheim.TesseractOCR`; macOS: `brew install ffmpeg tesseract`; Linux: `sudo apt install ffmpeg tesseract-ocr`).
 2. Nối MCP cho agent:
    - Claude Code: `claude mcp add agent-mask -- agent-mask mcp`
@@ -110,6 +110,24 @@ Hãy kiểm thử ứng dụng Agent Mask trên máy này và viết báo cáo. 
 - Lấy 1–3 bản quay màn hình thật dài 1–5 phút, có hiện dữ liệu giả (ví dụ mở Notepad gõ các dòng trong `secrets.txt` rồi quay), cho vào `am-test/real/`.
 - Chạy `batch`. Ghi thời gian xử lý mỗi file so với độ dài video, và kết quả `verified` hay `_review`.
 - Xem lại video ra: có khung hình nào lộ chữ không? Ghi giây cụ thể.
+
+**9. Kiểm lại lỗi R9 (cuộn nhanh, cuộn ngược)**
+- Chạy lại Agent Mask trên `training\training-demo.mp4` của lần thử trước (hoặc dựng lại đúng như cũ: trang dài, cuộn nhiều tốc độ, 2 cú nhảy ngược, bí mật rải khắp trang, cuộn tới cuối trang để cả 8 bí mật đều vào khung).
+- Nghiệm thu: OCR **mọi khung hình (30 khung/giây)** của bản ra. Không được còn `jane.doe@example.com`, `sk-proj`, `Tr0ngDong` hay bí mật nào khác, đặc biệt ở các khung ngay sau cú nhảy và các đoạn cuộn từ 200 px/s trở lên.
+- Mở `report.json`: mỗi video phải có mục `regions` (loại + giây bắt đầu, giây kết thúc), không có nội dung đã che.
+- So sánh thời gian xử lý với lần trước (85,2 giây cho 59 giây video).
+
+**10. Trình diễn cho anh Adam**
+- Ghép `AgentMask-0.1.1-showcase.mp4` dài 1–2 phút bằng ffmpeg. Mỗi đoạn 5–15 giây, có thẻ tiêu đề tiếng Việt 2 giây đặt trước:
+  1. Cả thư mục trước khi che (lưới ảnh các file vào).
+  2. Lệnh `batch` chạy trong terminal (quay màn hình).
+  3. Ảnh trước/sau đặt cạnh nhau.
+  4. Video chữ cuộn trước/sau, cạnh nhau (`hstack`), gồm cả đoạn cuộn nhanh và cú nhảy ngược.
+  5. `report.md` mở trên màn hình.
+  6. Agent gọi MCP `mask_folder` + `job_wait` (quay màn hình phiên agent).
+  7. API: `curl` giao việc, xem tiến độ trực tiếp, webhook nhận kết quả.
+  8. Chế độ canh thư mục: thả file vào, file đã che xuất hiện.
+- Viết `AgentMask-SHOWCASE.md` liệt kê mọi file đã nộp, mỗi dòng một câu "cần xem gì".
 
 **Báo cáo** — một bảng tổng hợp mỗi bước (Đạt / Không đạt / Không thử được, kèm lý do), rồi:
 - thông tin máy và kết quả `doctor`;

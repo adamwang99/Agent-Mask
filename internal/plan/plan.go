@@ -171,6 +171,8 @@ type Point struct {
 	Bg  *float64 `json:"bg,omitempty"` // gray level of the surface under the text, when known
 	// Propagated: found by its pixels in a frame where OCR missed it.
 	Propagated bool `json:"propagated,omitempty"`
+	// Off: scrolled out of view at this moment (nothing to hide).
+	Off bool `json:"off,omitempty"`
 }
 
 // Track is one piece of sensitive text over time.
@@ -306,9 +308,17 @@ func FinalizeTracks(tracks []*Track, times []float64, durationSec float64) []*Tr
 	for _, tr := range tracks {
 		pts := append([]Point(nil), tr.Points...)
 		sort.SliceStable(pts, func(i, j int) bool { return pts[i].T < pts[j].T })
-		box := pts[0].Box
+		var box Box
+		first := true
 		for _, p := range pts {
-			box = Union(box, p.Box)
+			if p.Off {
+				continue
+			}
+			if first {
+				box, first = p.Box, false
+			} else {
+				box = Union(box, p.Box)
+			}
 		}
 		preview := tr.Preview
 		if preview == "" {
@@ -345,17 +355,22 @@ func (tr *Track) BoxAt(T float64) (box Box, bg *float64, ok bool) {
 	}
 	pts := tr.Points
 	if T <= pts[0].T {
-		return pts[0].Box, pts[0].Bg, true
+		return pts[0].Box, pts[0].Bg, !pts[0].Off
 	}
 	last := pts[len(pts)-1]
 	if T >= last.T {
-		return last.Box, last.Bg, true
+		return last.Box, last.Bg, !last.Off
 	}
-	i := 0
-	for pts[i+1].T < T {
-		i++
-	}
+	i := sort.Search(len(pts), func(k int) bool { return pts[k].T >= T }) - 1
 	a, b := pts[i], pts[i+1]
+	switch {
+	case a.Off && b.Off:
+		return Box{}, nil, false
+	case a.Off:
+		return b.Box, b.Bg, true
+	case b.Off:
+		return a.Box, a.Bg, true
+	}
 	near := a
 	if T-a.T > b.T-T {
 		near = b
@@ -366,4 +381,86 @@ func (tr *Track) BoxAt(T float64) (box Box, bg *float64, ok bool) {
 	f := (T - a.T) / (b.T - a.T)
 	mid := Box{X0: lerp(a.Box.X0, b.Box.X0, f), Y0: lerp(a.Box.Y0, b.Box.Y0, f), X1: lerp(a.Box.X1, b.Box.X1, f), Y1: lerp(a.Box.Y1, b.Box.Y1, f)}
 	return Union(mid, near.Box), near.Bg, true
+}
+
+// FollowScroll moves each secret with the page on every frame. shift is how far the page has
+// scrolled at each frame (a share of the height), scene where the picture changed beyond a
+// scroll. A secret read at a few frames sits at one place on the page: from there its box is
+// known on every frame of the scene, including the frames between two reads, a jump, and the
+// moment it enters or leaves at an edge. Secrets that stay put while the page scrolls (in a
+// header or a sidebar) are left as they are.
+func FollowScroll(tracks []*Track, shift []float64, scene []int, fps float64) {
+	frameAt := func(t float64) int { return max(0, min(len(shift)-1, int(math.Round(t*fps)))) }
+	for _, tr := range tracks {
+		byScene := map[int][]Point{}
+		for _, p := range tr.Points {
+			f := frameAt(p.T)
+			byScene[scene[f]] = append(byScene[scene[f]], p)
+		}
+		var added []Point
+		for sc, pts := range byScene {
+			// Where it is on the page, from each read; and whether it moved with the page.
+			var pageY0, pageY1, screenY []float64
+			minS, maxS := math.Inf(1), math.Inf(-1)
+			for _, p := range pts {
+				s := shift[frameAt(p.T)]
+				pageY0 = append(pageY0, p.Box.Y0+s)
+				pageY1 = append(pageY1, p.Box.Y1+s)
+				screenY = append(screenY, p.Box.Y0)
+				minS, maxS = math.Min(minS, s), math.Max(maxS, s)
+			}
+			if maxS-minS > 0.02 && spread(screenY) < 0.005 {
+				continue // it did not move while the page did: a fixed part of the screen
+			}
+			// Its place on the page: most reads agree; one odd read (a frame caught mid-jump)
+			// must not cost the others.
+			y0, y1 := median(pageY0), median(pageY1)
+			agree := 0
+			for _, v := range pageY0 {
+				if math.Abs(v-y0) <= 0.02 {
+					agree++
+				}
+			}
+			if agree*10 < len(pageY0)*6 {
+				continue // it does not keep one place on the page: leave it to the reads
+			}
+			box := pts[0].Box
+			for _, p := range pts[1:] {
+				box.X0, box.X1 = math.Min(box.X0, p.Box.X0), math.Max(box.X1, p.Box.X1)
+			}
+			pad := 0.004 + 0.1*(y1-y0)
+			bg := pts[0].Bg
+			for f := range shift {
+				if scene[f] != sc {
+					continue
+				}
+				top, bottom := y0-shift[f]-pad, y1-shift[f]+pad
+				if bottom < 0 || top > 1 {
+					added = append(added, Point{T: float64(f) / fps, Off: true, Propagated: true})
+					continue
+				}
+				b := Box{X0: box.X0, Y0: math.Max(0, top), X1: box.X1, Y1: math.Min(1, bottom)}
+				added = append(added, Point{T: float64(f) / fps, Box: b, Bg: bg, Propagated: true})
+			}
+		}
+		tr.Points = append(tr.Points, added...)
+		sort.SliceStable(tr.Points, func(i, j int) bool { return tr.Points[i].T < tr.Points[j].T })
+	}
+}
+
+func spread(v []float64) float64 {
+	if len(v) == 0 {
+		return 0
+	}
+	lo, hi := v[0], v[0]
+	for _, x := range v {
+		lo, hi = math.Min(lo, x), math.Max(hi, x)
+	}
+	return hi - lo
+}
+
+func median(v []float64) float64 {
+	s := append([]float64(nil), v...)
+	sort.Float64s(s)
+	return s[len(s)/2]
 }

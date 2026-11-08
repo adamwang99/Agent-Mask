@@ -1,6 +1,9 @@
 package plan
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func box(y float64) Box { return Box{X0: 0.1, Y0: y, X1: 0.5, Y1: y + 0.03} }
 func det(kind, text string, y float64) Detection {
@@ -95,5 +98,35 @@ func TestBgInsideTheBox(t *testing.T) {
 	}
 	if bg := BgAround(img, tw, th, Box{X0: 0.1, Y0: 5.0 / 20, X1: 0.8, Y1: 9.0 / 20}); bg == nil || *bg < 230 {
 		t.Fatal("background")
+	}
+}
+
+func TestFollowScrollCoversBetweenReadsAndEdges(t *testing.T) {
+	// The page scrolls 0.02 of the height per frame for 60 frames (30 fps).
+	shift := make([]float64, 60)
+	scene := make([]int, 60)
+	for f := range shift {
+		shift[f] = 0.02 * float64(f)
+	}
+	// Read twice: at frame 15 (y 0.5) and frame 30 (y 0.2). Page y = 0.8.
+	tr := &Track{Kind: "api-key", Points: []Point{
+		{T: 0.5, Box: Box{X0: 0.1, Y0: 0.5, X1: 0.6, Y1: 0.53}},
+		{T: 1.0, Box: Box{X0: 0.1, Y0: 0.2, X1: 0.6, Y1: 0.23}},
+	}}
+	FollowScroll([]*Track{tr}, shift, scene, 30)
+	tracks := FinalizeTracks([]*Track{tr}, []float64{0.5, 1.0}, 2)
+	tr = tracks[0]
+	for f := 0; f < 60; f++ {
+		T := float64(f) / 30
+		y := 0.8 - shift[f]
+		box, _, ok := tr.BoxAt(T)
+		visible := y+0.03 > 0 && y < 1
+		if visible && (!ok || box.Y0 > math.Max(0, y)+1e-6 || box.Y1 < math.Min(1, y+0.03)-1e-6) {
+			t.Fatalf("frame %d: text at %.3f, mask %+v ok=%v", f, y, box, ok)
+		}
+	}
+	// Scrolled out of view: nothing drawn.
+	if _, _, ok := tr.BoxAt(59.0 / 30); ok {
+		t.Fatal("masked after it left the screen")
 	}
 }

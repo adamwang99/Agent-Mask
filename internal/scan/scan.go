@@ -16,6 +16,7 @@ import (
 	"math"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 
@@ -152,9 +153,17 @@ func Video(video string, o Options) (*Result, error) {
 	if w <= 1920 { // small screens are read at twice the size
 		zoom = 2
 	}
+	// Every k-th frame, chosen by number: the fps filter would take a frame up to half a look
+	// late, and a fast scroll then puts the text where it was not at that time. The same frame
+	// numbering (start at 0, constant rate) is used by the motion pass and by the render.
+	vfps := info.FPS
+	if vfps <= 0 || vfps > 120 {
+		vfps = 30
+	}
+	every := max(1, int(math.Round(vfps/o.LookFPS)))
 	cmd := exec.Command("ffmpeg", "-v", "error", "-i", video,
-		"-vf", fmt.Sprintf("%sfps=%g,scale=%d:%d:flags=area,format=gray", cropFilter, o.LookFPS, w, h),
-		"-f", "rawvideo", "-pix_fmt", "gray", "-")
+		"-vf", fmt.Sprintf("%ssetpts=PTS-STARTPTS,fps=%g,select='not(mod(n\\,%d))',scale=%d:%d:flags=area,format=gray", cropFilter, vfps, every, w, h),
+		"-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "-")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -213,7 +222,7 @@ func Video(video string, o Options) (*Result, error) {
 		if _, err := io.ReadFull(r, gray); err != nil {
 			break
 		}
-		t := float64(n) / o.LookFPS
+		t := float64(n*every) / vfps
 		means := BlockMeans(gray, w, h)
 		// Compared with the last frame read: a big change (a scroll, a new window) is read now;
 		// any change at all, down to one block (a code appearing, a typed character), within
@@ -242,7 +251,39 @@ func Video(video string, o Options) (*Result, error) {
 		return nil, fmt.Errorf("ffmpeg: %v %s", err, strings.TrimSpace(lastChars(stderr.String(), 300)))
 	}
 
+	// The scroll on every frame; then the parts of the page that went by between two reads
+	// (a jump, a fast scroll) are read too.
+	motion, merr := MeasureMotion(video, cropFilter, srcW, srcH, vfps)
+	var motionWarn string
+	if merr != nil {
+		motionWarn = "motion not measured, masks follow the reads only: " + merr.Error()
+		motion = nil
+	}
+	if motion != nil {
+		if extra := motion.Uncovered(times); len(extra) > 0 {
+			frames, err := grabFrames(video, cropFilter, motion.FPS, extra, w, h)
+			if err != nil {
+				motionWarn = "extra reads failed: " + err.Error()
+			}
+			for i, gray := range frames {
+				t := float64(extra[i]) / motion.FPS
+				j := &job{done: make(chan struct{})}
+				jobs = append(jobs, j)
+				keys = append(keys, plan.Keyframe{Thumb: plan.HalfSize(gray, w, h), Times: []float64{t}})
+				times = append(times, t)
+				jobOf = append(jobOf, len(jobs)-1)
+				sem <- struct{}{}
+				wg.Add(1)
+				go ocrFrame(j, gray, t)
+			}
+			wg.Wait()
+		}
+	}
+
 	res := &Result{Video: video, Width: info.Width, Height: info.Height, DurationSec: info.DurationSec, LookFPS: o.LookFPS, FramesScanned: len(times)}
+	if motionWarn != "" {
+		res.Warnings = append(res.Warnings, motionWarn)
+	}
 	var samples []plan.Sample
 	for i, t := range times {
 		var dets []plan.Detection
@@ -263,6 +304,7 @@ func Video(video string, o Options) (*Result, error) {
 		}
 		return nil, fmt.Errorf("OCR failed on every frame, nothing was scanned. First error: %s", first)
 	}
+	sort.SliceStable(samples, func(i, j int) bool { return samples[i].TimeSec < samples[j].TimeSec })
 	tw, th := w>>1, h>>1
 	linked := plan.LinkTracks(samples, 0)
 	plan.Propagate(linked, keys, tw, th, 0)
@@ -280,9 +322,35 @@ func Video(video string, o Options) (*Result, error) {
 			}
 		}
 	}
+	if motion != nil {
+		plan.FollowScroll(linked, motion.Shift, motion.Scene, motion.FPS)
+	}
+	sort.Float64s(times)
 	res.Regions = plan.FinalizeTracks(linked, times, info.DurationSec)
 	if res.Regions == nil {
 		res.Regions = []*plan.Track{}
+	}
+	return res, nil
+}
+
+// grabFrames decodes some frames (by number at fps) at the OCR size.
+func grabFrames(video, cropFilter string, fps float64, frames []int, w, h int) ([][]byte, error) {
+	var sel []string
+	for _, f := range frames {
+		sel = append(sel, fmt.Sprintf("eq(n\\,%d)", f))
+	}
+	vf := fmt.Sprintf("%ssetpts=PTS-STARTPTS,fps=%g,select='%s',scale=%d:%d:flags=area,format=gray", cropFilter, fps, strings.Join(sel, "+"), w, h)
+	cmd := exec.Command("ffmpeg", "-v", "error", "-i", video, "-vf", vf, "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "-")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%v %s", err, strings.TrimSpace(lastChars(stderr.String(), 300)))
+	}
+	var res [][]byte
+	for len(out) >= w*h && len(res) < len(frames) {
+		res = append(res, out[:w*h])
+		out = out[w*h:]
 	}
 	return res, nil
 }
