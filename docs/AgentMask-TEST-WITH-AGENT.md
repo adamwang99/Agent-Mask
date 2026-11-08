@@ -1,4 +1,4 @@
-# Thử Agent Mask bằng agent
+# Agent Mask — hướng dẫn thử bằng agent (AgentMask-TEST-WITH-AGENT.md)
 
 Tài liệu cho agent tester (Claude Code, Codex, Cursor…) chạy trên máy thật: Windows 10/11 (chính),
 macOS hoặc Linux nếu có. Chỉ dùng **dữ liệu giả**: không đưa bất kỳ mật khẩu, khoá hay email thật nào vào thư mục thử.
