@@ -78,6 +78,32 @@ Options: `--lang vie+eng` (Vietnamese screens), `--kinds email,phone,api-key` (a
 `private-key`, `credit-card`, `secret-assignment`, `url-credentials`, `high-entropy`), `--style mosaic`,
 `--overwrite`, `--notify` (desktop notice), `--on-done "command"`, `--callback https://…`.
 Keep a folder masked as files arrive: `agent-mask watch <in> <out>`.
+One file instead of a folder works too: `agent-mask batch demo.mp4 safe` (the output folder must
+not be the file's own folder).
+
+### What `report.json` says about a video
+
+```json
+{
+  "status": "review",
+  "regions": [
+    { "kind": "email", "startSec": 0, "endSec": 31.4,
+      "onScreen": [ { "startSec": 0, "endSec": 12.3 }, { "startSec": 22.1, "endSec": 31.4 } ] }
+  ],
+  "stillReadable": [
+    { "kind": "api-key", "startSec": 50.07, "endSec": 52.2,
+      "sightings": [ { "sec": 50.17, "x": 188, "y": 512, "width": 604, "height": 30 } ] }
+  ]
+}
+```
+
+- `regions`: one entry per hidden thing. `onScreen` lists each stretch of time it was in the
+  picture (a page can scroll away and come back); `startSec` / `endSec` are the first and the last
+  moment of those stretches. Outside them nothing is drawn.
+- `stillReadable` (only when the file is not verified): what the check could still read in the
+  output. `sightings` are the frames where the check read it: the second, and the box in pixels
+  of the output. Open the file in `_review/` at that second to see it.
+- Neither holds the text itself, only its kind.
 
 ## Use it from an agent
 

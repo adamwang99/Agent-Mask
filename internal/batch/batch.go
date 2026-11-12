@@ -45,20 +45,22 @@ const ReviewDir = "_review"
 
 // FileReport is one file's result. It never holds the hidden text, only its kinds.
 type FileReport struct {
-	Input    string          `json:"input"`
-	Output   string          `json:"output,omitempty"`
-	Type     string          `json:"type"`   // video, image
-	Status   string          `json:"status"` // pending, running, verified, review, failed, skipped
-	Found    int             `json:"found"`
-	Hidden   int             `json:"hidden"`
-	Kinds    map[string]int  `json:"kinds,omitempty"`
-	Regions  []redact.Region `json:"regions,omitempty"` // when each hidden thing was on screen (videos)
-	Verified bool            `json:"verified"`
-	Reasons  []string        `json:"reasons,omitempty"`
-	Error    string          `json:"error,omitempty"`
-	Seconds  float64         `json:"seconds"`
-	rel      string
-	outRel   string
+	Input   string          `json:"input"`
+	Output  string          `json:"output,omitempty"`
+	Type    string          `json:"type"`   // video, image
+	Status  string          `json:"status"` // pending, running, verified, review, failed, skipped
+	Found   int             `json:"found"`
+	Hidden  int             `json:"hidden"`
+	Kinds   map[string]int  `json:"kinds,omitempty"`
+	Regions []redact.Region `json:"regions,omitempty"` // when each hidden thing was on screen (videos)
+	// StillReadable: where and when the check could still read something (not verified).
+	StillReadable []redact.Finding `json:"stillReadable,omitempty"`
+	Verified      bool             `json:"verified"`
+	Reasons       []string         `json:"reasons,omitempty"`
+	Error         string           `json:"error,omitempty"`
+	Seconds       float64          `json:"seconds"`
+	rel           string
+	outRel        string
 }
 
 // Job is one folder.
@@ -164,8 +166,11 @@ func List(in string) ([]string, error) {
 	return out, err
 }
 
-// Start queues a job for a folder.
+// Start queues a job for a folder, or for one video or picture.
 func (m *Manager) Start(in, out string, o Options) (*Job, error) {
+	if st, err := os.Stat(in); err == nil && st.Mode().IsRegular() {
+		return m.startFile(in, out, o)
+	}
 	in, out, err := Check(in, out)
 	if err != nil {
 		return nil, err
@@ -175,6 +180,25 @@ func (m *Manager) Start(in, out string, o Options) (*Job, error) {
 		return nil, err
 	}
 	return m.queueFiles(in, out, files, o)
+}
+
+// startFile queues a job for one file. Only that file is read, so the output folder may be
+// anywhere but the file's own folder (the result would take the file's place).
+func (m *Manager) startFile(file, out string, o Options) (*Job, error) {
+	if out == "" {
+		return nil, fmt.Errorf("an input and an output folder are both needed")
+	}
+	file, _ = filepath.Abs(file)
+	out, _ = filepath.Abs(out)
+	in := filepath.Dir(file)
+	if r, err := filepath.Rel(in, out); err == nil && r == "." {
+		return nil, fmt.Errorf("the output folder must not be the folder of the input file")
+	}
+	ext := strings.ToLower(filepath.Ext(file))
+	if !VideoExts[ext] && !ImageExts[ext] {
+		return nil, fmt.Errorf("%s is not a video or picture", file)
+	}
+	return m.queueFiles(in, out, []string{file}, o)
 }
 
 // StartFiles queues a job for some files of a folder (watch mode: the new ones).
@@ -485,6 +509,7 @@ func (m *Manager) one(j *Job, f *FileReport, idx *index) *FileReport {
 		return r
 	}
 	r.Found, r.Hidden, r.Kinds, r.Verified, r.Reasons, r.Regions = res.Found, res.Hidden, res.Kinds, res.Verified, res.Reasons, res.Regions
+	r.StillReadable = res.StillReadable
 	dest := outRel
 	r.Status = "verified"
 	if !r.Verified {
@@ -526,7 +551,7 @@ func redactVideo(in, out string, o Options) (*FileReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FileReport{Found: res.Found, Hidden: res.Hidden, Verified: res.Verified, Reasons: res.Reasons, Kinds: res.Kinds, Regions: res.Regions}, nil
+	return &FileReport{Found: res.Found, Hidden: res.Hidden, Verified: res.Verified, Reasons: res.Reasons, Kinds: res.Kinds, Regions: res.Regions, StillReadable: res.StillReadable}, nil
 }
 
 func kindsOf(r *scan.Result) map[string]int {

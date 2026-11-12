@@ -109,6 +109,7 @@ func redactImage(in, out string, o Options) (*FileReport, error) {
 	}
 	r := &FileReport{Found: len(found.Regions), Hidden: len(a) + len(bb), Kinds: kindsOf(found)}
 	r.Verified, r.Reasons = redact.Verdict(check)
+	r.StillReadable = redact.Findings(check)
 	// A picture whose only text was sensitive reads empty once hidden: the OCR proved it works
 	// on this picture by reading the original, so an empty, error-free check is a pass.
 	if !r.Verified && found.WordsRead > 0 && check.WordsRead == 0 && len(check.Regions) == 0 && len(check.Warnings) == 0 {
