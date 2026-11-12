@@ -128,6 +128,48 @@ func TestFollowScrollCoversBetweenReadsAndEdges(t *testing.T) {
 	if _, _, ok := tr.BoxAt(59.0 / 30); ok {
 		t.Fatal("masked after it left the screen")
 	}
+	// It is on screen from the start until it leaves at the top (page y 0.8, 0.03 high, gone
+	// when the page has scrolled 0.83 and a little margin: frame 42), not for the whole video.
+	if len(tr.OnScreen) != 1 || tr.StartSec != 0 || tr.EndSec < 41.0/30 || tr.EndSec > 43.0/30 {
+		t.Fatalf("on screen %+v (%v to %v), want one stretch from 0 to about 1.4", tr.OnScreen, tr.StartSec, tr.EndSec)
+	}
+}
+
+// A page that scrolls away and comes back (a jump back): the secret is reported on screen
+// twice, not from the first frame to the last (issue #1, B).
+func TestOnScreenStretches(t *testing.T) {
+	shift := make([]float64, 150)
+	scene := make([]int, 150)
+	for f := range shift {
+		switch {
+		case f < 30: // still
+		case f < 60: // scrolls two screens down in a second
+			shift[f] = 2 * float64(f-30) / 30
+		case f < 90: // stays there
+			shift[f] = 2
+		case f < 96: // jumps back in 0.2 s
+			shift[f] = 2 - 2*float64(f-90)/6
+		}
+	}
+	tr := &Track{Kind: "email", Points: []Point{{T: 0.5, Box: Box{X0: 0.1, Y0: 0.5, X1: 0.5, Y1: 0.53}}}}
+	tr = FinalizeTracks(FollowScroll([]*Track{tr}, shift, scene, 30), []float64{0.5}, 5)[0]
+	if len(tr.OnScreen) != 2 {
+		t.Fatalf("%d stretches on screen, want 2: %+v", len(tr.OnScreen), tr.OnScreen)
+	}
+	a, b := tr.OnScreen[0], tr.OnScreen[1]
+	// Leaves at the top once the page has scrolled about 0.53: frame 38. Back during the jump:
+	// frame 95. Then until the end.
+	if a.StartSec != 0 || math.Abs(a.EndSec-38.0/30) > 0.07 || math.Abs(b.StartSec-95.0/30) > 0.07 || b.EndSec != 5 {
+		t.Fatalf("stretches %+v", tr.OnScreen)
+	}
+	if tr.StartSec != a.StartSec || tr.EndSec != b.EndSec {
+		t.Fatalf("track %v to %v", tr.StartSec, tr.EndSec)
+	}
+	for f, want := range map[int]bool{10: true, 45: false, 80: false, 120: true} {
+		if _, _, ok := tr.BoxAt(float64(f) / 30); ok != want {
+			t.Fatalf("frame %d: masked %v, want %v", f, ok, want)
+		}
+	}
 }
 
 // The same text at two places on the page: each place is followed on its own.

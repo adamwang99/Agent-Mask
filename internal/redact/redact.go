@@ -26,13 +26,55 @@ type Result struct {
 	Reasons  []string       `json:"reasons,omitempty"`
 	Warnings []string       `json:"warnings,omitempty"`
 	Regions  []Region       `json:"regions,omitempty"`
+	// StillReadable: what the check read in the output, when it is not verified.
+	StillReadable []Finding `json:"stillReadable,omitempty"`
 }
 
 // Region: what kind of thing was hidden, and when it was on screen. Never its text.
 type Region struct {
-	Kind     string  `json:"kind"`
-	StartSec float64 `json:"startSec"`
-	EndSec   float64 `json:"endSec"`
+	Kind     string      `json:"kind"`
+	StartSec float64     `json:"startSec"` // first on screen
+	EndSec   float64     `json:"endSec"`   // last on screen
+	OnScreen []plan.Span `json:"onScreen"` // each stretch on screen (it can scroll away and come back)
+}
+
+// Finding: something sensitive the check could still read in the output: its kind, when it
+// was on screen, and where and when the check read it. Never its text.
+type Finding struct {
+	Kind      string     `json:"kind"`
+	StartSec  float64    `json:"startSec"`
+	EndSec    float64    `json:"endSec"`
+	Sightings []Sighting `json:"sightings"`
+}
+
+// Sighting: one read of a finding, in pixels of the output.
+type Sighting struct {
+	Sec    float64 `json:"sec"`
+	X      int     `json:"x"`
+	Y      int     `json:"y"`
+	Width  int     `json:"width"`
+	Height int     `json:"height"`
+}
+
+func round2(v float64) float64 { return math.Round(v*100) / 100 }
+
+// Findings lists what a check scan read, for the report.
+func Findings(check *scan.Result) []Finding {
+	var out []Finding
+	W, H := float64(check.Width), float64(check.Height)
+	for _, t := range check.Regions {
+		f := Finding{Kind: t.Kind, StartSec: round2(t.StartSec), EndSec: round2(t.EndSec), Sightings: []Sighting{}}
+		for _, p := range t.Points {
+			if p.Off || p.Propagated { // only where the check read it itself
+				continue
+			}
+			x, y := int(math.Floor(p.Box.X0*W)), int(math.Floor(p.Box.Y0*H))
+			f.Sightings = append(f.Sightings, Sighting{Sec: round2(p.T), X: x, Y: y,
+				Width: int(math.Ceil(p.Box.X1*W)) - x, Height: int(math.Ceil(p.Box.Y1*H)) - y})
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // BoxesAt: the boxes to hide at time T, in their two groups.
@@ -63,7 +105,7 @@ func Verdict(check *scan.Result) (bool, []string) {
 		reasons = append(reasons, "OCR read no text at all in the output, so it cannot vouch for it")
 	}
 	if len(check.Regions) > 0 {
-		reasons = append(reasons, fmt.Sprintf("%d sensitive region(s) still readable", len(check.Regions)))
+		reasons = append(reasons, fmt.Sprintf("%d sensitive region(s) still readable (where and when: stillReadable in report.json)", len(check.Regions)))
 	}
 	return len(reasons) == 0, reasons
 }
@@ -93,9 +135,14 @@ func Video(in, out string, o Options) (*Result, error) {
 			r.Kinds = map[string]int{}
 		}
 		r.Kinds[t.Kind]++
-		r.Regions = append(r.Regions, Region{Kind: t.Kind, StartSec: math.Round(t.StartSec*100) / 100, EndSec: math.Round(t.EndSec*100) / 100})
+		reg := Region{Kind: t.Kind, StartSec: round2(t.StartSec), EndSec: round2(t.EndSec), OnScreen: []plan.Span{}}
+		for _, sp := range t.OnScreen {
+			reg.OnScreen = append(reg.OnScreen, plan.Span{StartSec: round2(sp.StartSec), EndSec: round2(sp.EndSec)})
+		}
+		r.Regions = append(r.Regions, reg)
 	}
 	r.Verified, r.Reasons = Verdict(check)
+	r.StillReadable = Findings(check)
 	// Everything readable was sensitive and is now hidden: the first scan proved the OCR works
 	// on this video, so an empty, error-free check is a pass.
 	if !r.Verified && found.WordsRead > 0 && check.WordsRead == 0 && len(check.Regions) == 0 && len(check.Warnings) == 0 {

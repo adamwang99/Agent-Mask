@@ -182,9 +182,16 @@ type Track struct {
 	Preview  string  `json:"preview"`
 	Text     string  `json:"-"`
 	Points   []Point `json:"points"`
+	StartSec float64 `json:"startSec"` // first on screen
+	EndSec   float64 `json:"endSec"`   // last on screen
+	OnScreen []Span  `json:"onScreen"` // each stretch on screen: a page scrolls away and comes back
+	Box      Box     `json:"box"`
+}
+
+// Span is a stretch of time.
+type Span struct {
 	StartSec float64 `json:"startSec"`
 	EndSec   float64 `json:"endSec"`
-	Box      Box     `json:"box"`
 }
 
 // Sample is every detection of one OCR'd frame.
@@ -281,9 +288,11 @@ func LinkTracks(samples []Sample, maxBridgeSec float64) []*Track {
 	return tracks
 }
 
-// FinalizeTracks sorts points, sets each track's time span and bounding box, numbers the
-// tracks. StartSec/EndSec extend to the previous / next look at the screen: the text may have
-// appeared just after the previous look and gone just before the next.
+// FinalizeTracks sorts points, sets each track's stretches on screen and bounding box, numbers
+// the tracks. A stretch runs between the points where the text is out of view (a track that
+// follows the scroll has a point on every frame). Where no point says it is out of view, the
+// stretch extends to the previous / next look at the screen: the text may have appeared just
+// after the previous look and gone just before the next.
 func FinalizeTracks(tracks []*Track, times []float64, durationSec float64) []*Track {
 	sorted := append([]float64(nil), times...)
 	sort.Float64s(sorted)
@@ -324,8 +333,30 @@ func FinalizeTracks(tracks []*Track, times []float64, durationSec float64) []*Tr
 		if preview == "" {
 			preview = detect.MaskedPreview(tr.Text)
 		}
+		var spans []Span
+		for i := 0; i < len(pts); i++ {
+			if pts[i].Off {
+				continue
+			}
+			j := i
+			for j+1 < len(pts) && !pts[j+1].Off {
+				j++
+			}
+			sp := Span{StartSec: pts[i].T, EndSec: pts[j].T}
+			if i == 0 {
+				sp.StartSec = prevTime(pts[0].T)
+			}
+			if j == len(pts)-1 {
+				sp.EndSec = math.Min(durationSec, nextTime(pts[j].T))
+			}
+			spans = append(spans, sp)
+			i = j
+		}
+		if len(spans) == 0 { // never in view: nothing to hide
+			spans = []Span{{StartSec: pts[0].T, EndSec: pts[0].T}}
+		}
 		out = append(out, &Track{Kind: tr.Kind, Preview: preview, Text: tr.Text, Points: pts,
-			StartSec: prevTime(pts[0].T), EndSec: math.Min(durationSec, nextTime(pts[len(pts)-1].T)), Box: box})
+			StartSec: spans[0].StartSec, EndSec: spans[len(spans)-1].EndSec, OnScreen: spans, Box: box})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].StartSec < out[j].StartSec })
 	for i, tr := range out {
