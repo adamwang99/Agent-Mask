@@ -164,8 +164,11 @@ func List(in string) ([]string, error) {
 	return out, err
 }
 
-// Start queues a job for a folder.
+// Start queues a job for a folder, or for one video or picture.
 func (m *Manager) Start(in, out string, o Options) (*Job, error) {
+	if st, err := os.Stat(in); err == nil && st.Mode().IsRegular() {
+		return m.startFile(in, out, o)
+	}
 	in, out, err := Check(in, out)
 	if err != nil {
 		return nil, err
@@ -175,6 +178,25 @@ func (m *Manager) Start(in, out string, o Options) (*Job, error) {
 		return nil, err
 	}
 	return m.queueFiles(in, out, files, o)
+}
+
+// startFile queues a job for one file. Only that file is read, so the output folder may be
+// anywhere but the file's own folder (the result would take the file's place).
+func (m *Manager) startFile(file, out string, o Options) (*Job, error) {
+	if out == "" {
+		return nil, fmt.Errorf("an input and an output folder are both needed")
+	}
+	file, _ = filepath.Abs(file)
+	out, _ = filepath.Abs(out)
+	in := filepath.Dir(file)
+	if r, err := filepath.Rel(in, out); err == nil && r == "." {
+		return nil, fmt.Errorf("the output folder must not be the folder of the input file")
+	}
+	ext := strings.ToLower(filepath.Ext(file))
+	if !VideoExts[ext] && !ImageExts[ext] {
+		return nil, fmt.Errorf("%s is not a video or picture", file)
+	}
+	return m.queueFiles(in, out, []string{file}, o)
 }
 
 // StartFiles queues a job for some files of a folder (watch mode: the new ones).

@@ -31,6 +31,7 @@ const help = `Agent Mask - hide sensitive text in videos and pictures, a whole f
       input folder, sub-folders kept. Each result is checked again: one that still shows
       something goes to <output>/_review/. report.json and report.md list every file.
       Files already done (same size, time and options) are skipped on the next run.
+      The input may also be one video or picture instead of a folder.
       Exit code: 0 all verified, 1 some file to review or failed, 2 the job could not run.
   agent-mask watch <input folder> <output folder> [options]
       the same for each file that appears in the input folder, until Ctrl+C

@@ -78,6 +78,8 @@ Options: `--lang vie+eng` (Vietnamese screens), `--kinds email,phone,api-key` (a
 `private-key`, `credit-card`, `secret-assignment`, `url-credentials`, `high-entropy`), `--style mosaic`,
 `--overwrite`, `--notify` (desktop notice), `--on-done "command"`, `--callback https://…`.
 Keep a folder masked as files arrive: `agent-mask watch <in> <out>`.
+One file instead of a folder works too: `agent-mask batch demo.mp4 safe` (the output folder must
+not be the file's own folder).
 
 ## Use it from an agent
 
