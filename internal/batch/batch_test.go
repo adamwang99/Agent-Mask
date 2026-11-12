@@ -1,12 +1,19 @@
 package batch
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/adamwang99/agent-mask/internal/ocr"
+	"github.com/adamwang99/agent-mask/internal/scan"
 )
 
 func need(t *testing.T) {
@@ -169,5 +176,122 @@ func TestSingleFileJob(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "a.png")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Issue #1: a page of look-alike lines scrolled at 250 px/s, then jumped back. The masks must
+// be on the secrets on every frame: each frame of the output is read, none shows them. The
+// report says when each secret was on screen, not "the whole video".
+func TestFastScrollAndJumpVideo(t *testing.T) {
+	need(t)
+	if testing.Short() {
+		t.Skip("reads every frame of a video")
+	}
+	in, out := t.TempDir(), t.TempDir()
+	page, video := filepath.Join(in, "page.png"), filepath.Join(in, "scroll.mp4")
+	run := func(args ...string) {
+		t.Helper()
+		if b, err := exec.Command("ffmpeg", append([]string{"-v", "error", "-y"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatal(err, string(b))
+		}
+	}
+	// A 1280 x 2400 page, a line every 46 px; two of them hold a secret.
+	vf := ""
+	for i := 0; 40+46*i < 2370; i++ {
+		text := fmt.Sprintf("Step %02d open the settings page and check item %d", i, i*7%13)
+		switch i {
+		case 8:
+			text = "Owner jane.doe@example.com"
+		case 22:
+			text = "API_KEY=sk-proj-AbC123xYz789QwErTy456UiOp"
+		}
+		if i > 0 {
+			vf += ","
+		}
+		vf += fmt.Sprintf("drawtext=text='%s':fontsize=24:x=60:y=%d:fontcolor=black", text, 40+46*i)
+	}
+	run("-f", "lavfi", "-i", "color=c=white:s=1280x2400", "-vf", vf, "-frames:v", "1", page)
+	// 0-1 s still, 1-4 s 250 px/s, 4-4.5 s back 600 px, 4.5-5.5 s still.
+	y := "if(lt(t,1),0,if(lt(t,4),250*(t-1),if(lt(t,4.5),750-1200*(t-4),150)))"
+	run("-loop", "1", "-framerate", "30", "-i", page, "-vf", "crop=1280:720:0:'"+y+"',format=yuv420p", "-t", "5.5", "-c:v", "libx264", "-crf", "18", "-r", "30", video)
+	if err := os.Remove(page); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewManager()
+	j, err := m.Start(video, out, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, _ = m.Wait(j.ID, 5*time.Minute)
+	f := j.Files[0]
+	if f.Status != "verified" || len(f.StillReadable) != 0 {
+		t.Fatalf("%s: %v %+v", f.Status, f.Reasons, f.StillReadable)
+	}
+	// The email is on screen at the start, scrolls away, and is back after the jump; neither
+	// secret is reported on screen for the whole video.
+	twice := false
+	for _, r := range f.Regions {
+		if r.StartSec == 0 && r.EndSec > 5.4 && len(r.OnScreen) == 1 {
+			t.Errorf("%s reported on screen for the whole video: %+v", r.Kind, r)
+		}
+		if r.Kind == "email" && len(r.OnScreen) == 2 {
+			twice = true
+		}
+	}
+	if !twice {
+		t.Errorf("the email was on screen twice: %+v", f.Regions)
+	}
+
+	// Every frame of the output, read at twice its size.
+	const w, h = 1280, 720
+	raw, err := exec.Command("ffmpeg", "-v", "error", "-i", f.Output, "-f", "rawvideo", "-pix_fmt", "gray", "-").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames := len(raw) / (w * h)
+	if frames < 160 {
+		t.Fatalf("%d frames in the output", frames)
+	}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var leaks []string
+	words := 0
+	sem := make(chan struct{}, max(1, runtime.NumCPU()/2))
+	for n := 0; n < frames; n++ {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(n int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			img := ocr.PGM(scan.Upscale2x(raw[n*w*h:(n+1)*w*h], w, h), 2*w, 2*h)
+			for _, psm := range []int{6} {
+				ws, err := ocr.Image(img, "eng", psm)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				text := ""
+				for _, wd := range ws {
+					text += wd.Text + " "
+				}
+				mu.Lock()
+				words += len(ws)
+				for _, secret := range []string{"jane.doe", "example.com", "sk-proj", "AbC123"} {
+					if strings.Contains(text, secret) {
+						leaks = append(leaks, fmt.Sprintf("frame %d (%.2fs): %s", n, float64(n)/30, secret))
+					}
+				}
+				mu.Unlock()
+			}
+		}(n)
+	}
+	wg.Wait()
+	if words < 20*frames {
+		t.Fatalf("the check read %d words in %d frames: it cannot vouch for them", words, frames)
+	}
+	if len(leaks) > 0 {
+		sort.Strings(leaks)
+		t.Fatalf("%d secret(s) readable in the output, first: %s", len(leaks), leaks[0])
 	}
 }
