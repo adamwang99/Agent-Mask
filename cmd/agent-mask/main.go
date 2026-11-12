@@ -22,7 +22,7 @@ import (
 	"github.com/adamwang99/agent-mask/internal/ocr"
 )
 
-var version = "0.1.3" // set at build time: -ldflags "-X main.version=..."
+var version = "0.1.4" // set at build time: -ldflags "-X main.version=..."
 
 const help = `Agent Mask - hide sensitive text in videos and pictures, a whole folder at a time. Free.
 
