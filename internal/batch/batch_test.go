@@ -147,3 +147,27 @@ func TestRerunKeepsReview(t *testing.T) {
 		t.Fatalf("%+v %+v", j.Counts, j.Files[0])
 	}
 }
+
+// One file instead of a folder: only that file is done, and the output may sit next to it.
+func TestSingleFileJob(t *testing.T) {
+	need(t)
+	in := t.TempDir()
+	picture(t, filepath.Join(in, "a.png"), "Contact jane.doe@example.com")
+	picture(t, filepath.Join(in, "b.png"), "Call 0912 345 678")
+	m := NewManager()
+	if _, err := m.Start(filepath.Join(in, "a.png"), in, Options{}); err == nil {
+		t.Fatal("the file's own folder accepted as output")
+	}
+	out := filepath.Join(in, "out")
+	j, err := m.Start(filepath.Join(in, "a.png"), out, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, _ = m.Wait(j.ID, 2*time.Minute)
+	if j.Counts.Total != 1 || j.Counts.Verified != 1 {
+		t.Fatalf("%+v", j.Counts)
+	}
+	if _, err := os.Stat(filepath.Join(out, "a.png")); err != nil {
+		t.Fatal(err)
+	}
+}
