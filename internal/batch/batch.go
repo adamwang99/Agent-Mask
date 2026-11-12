@@ -45,20 +45,22 @@ const ReviewDir = "_review"
 
 // FileReport is one file's result. It never holds the hidden text, only its kinds.
 type FileReport struct {
-	Input    string          `json:"input"`
-	Output   string          `json:"output,omitempty"`
-	Type     string          `json:"type"`   // video, image
-	Status   string          `json:"status"` // pending, running, verified, review, failed, skipped
-	Found    int             `json:"found"`
-	Hidden   int             `json:"hidden"`
-	Kinds    map[string]int  `json:"kinds,omitempty"`
-	Regions  []redact.Region `json:"regions,omitempty"` // when each hidden thing was on screen (videos)
-	Verified bool            `json:"verified"`
-	Reasons  []string        `json:"reasons,omitempty"`
-	Error    string          `json:"error,omitempty"`
-	Seconds  float64         `json:"seconds"`
-	rel      string
-	outRel   string
+	Input   string          `json:"input"`
+	Output  string          `json:"output,omitempty"`
+	Type    string          `json:"type"`   // video, image
+	Status  string          `json:"status"` // pending, running, verified, review, failed, skipped
+	Found   int             `json:"found"`
+	Hidden  int             `json:"hidden"`
+	Kinds   map[string]int  `json:"kinds,omitempty"`
+	Regions []redact.Region `json:"regions,omitempty"` // when each hidden thing was on screen (videos)
+	// StillReadable: where and when the check could still read something (not verified).
+	StillReadable []redact.Finding `json:"stillReadable,omitempty"`
+	Verified      bool             `json:"verified"`
+	Reasons       []string         `json:"reasons,omitempty"`
+	Error         string           `json:"error,omitempty"`
+	Seconds       float64          `json:"seconds"`
+	rel           string
+	outRel        string
 }
 
 // Job is one folder.
@@ -507,6 +509,7 @@ func (m *Manager) one(j *Job, f *FileReport, idx *index) *FileReport {
 		return r
 	}
 	r.Found, r.Hidden, r.Kinds, r.Verified, r.Reasons, r.Regions = res.Found, res.Hidden, res.Kinds, res.Verified, res.Reasons, res.Regions
+	r.StillReadable = res.StillReadable
 	dest := outRel
 	r.Status = "verified"
 	if !r.Verified {
@@ -548,7 +551,7 @@ func redactVideo(in, out string, o Options) (*FileReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FileReport{Found: res.Found, Hidden: res.Hidden, Verified: res.Verified, Reasons: res.Reasons, Kinds: res.Kinds, Regions: res.Regions}, nil
+	return &FileReport{Found: res.Found, Hidden: res.Hidden, Verified: res.Verified, Reasons: res.Reasons, Kinds: res.Kinds, Regions: res.Regions, StillReadable: res.StillReadable}, nil
 }
 
 func kindsOf(r *scan.Result) map[string]int {
