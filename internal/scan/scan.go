@@ -271,7 +271,7 @@ func Video(video string, o Options) (*Result, error) {
 	}
 
 	// The scroll on every frame; then the parts of the page that went by between two reads
-	// (a jump, a fast scroll) are read too.
+	// (a jump, a fast scroll) are read too, and the frames where a jump starts and ends.
 	mres := <-motionDone
 	motion, merr := mres.m, mres.err
 	var motionWarn string
@@ -280,7 +280,17 @@ func Video(video string, o Options) (*Result, error) {
 		motion = nil
 	}
 	if motion != nil {
-		if extra := motion.Uncovered(times); len(extra) > 0 {
+		extra := motion.Uncovered(times)
+		read := map[int]bool{}
+		for _, t := range times {
+			read[motion.FrameAt(t)] = true
+		}
+		for _, f := range extra {
+			read[f] = true
+		}
+		extra = append(extra, motion.Jumps(read)...)
+		sort.Ints(extra)
+		if len(extra) > 0 {
 			frames, err := grabFrames(video, cropFilter, motion.FPS, extra, w, h)
 			if err != nil {
 				motionWarn = "extra reads failed: " + err.Error()
