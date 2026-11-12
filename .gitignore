@@ -2,3 +2,4 @@ packaging/out/
 /agent-mask
 /agent-mask.exe
 *.test
+agent-mask-*.exe

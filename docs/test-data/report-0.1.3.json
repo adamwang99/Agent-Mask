@@ -1,0 +1,174 @@
+{
+  "id": "job_8fb35c79c53b",
+  "input": "C:\\Users\\adam\\am-test\\r9-in",
+  "output": "C:\\Users\\adam\\am-test\\r913-out",
+  "options": {
+    "lang": "eng",
+    "style": "auto"
+  },
+  "status": "done",
+  "created": "2026-11-12T03:23:01.0407344Z",
+  "started": "2026-11-12T03:23:01.0407344Z",
+  "finished": "2026-11-12T03:24:32.3372711Z",
+  "counts": {
+    "total": 1,
+    "done": 1,
+    "verified": 0,
+    "review": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "report": "C:\\Users\\adam\\am-test\\r913-out\\report.json",
+  "files": [
+    {
+      "input": "C:\\Users\\adam\\am-test\\r9-in\\training-demo.mp4",
+      "output": "C:\\Users\\adam\\am-test\\r913-out\\_review\\training-demo.mp4",
+      "type": "video",
+      "status": "review",
+      "found": 26,
+      "hidden": 26,
+      "kinds": {
+        "api-key": 17,
+        "email": 6,
+        "secret-assignment": 3
+      },
+      "regions": [
+        {
+          "kind": "email",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "email",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "email",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "email",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "email",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "email",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "secret-assignment",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "secret-assignment",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "secret-assignment",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        },
+        {
+          "kind": "api-key",
+          "startSec": 0,
+          "endSec": 59.1
+        }
+      ],
+      "verified": false,
+      "reasons": [
+        "16 sensitive region(s) still readable"
+      ],
+      "seconds": 91.295
+    }
+  ]
+}
