@@ -115,7 +115,7 @@ curl -H "Authorization: Bearer $TOKEN" -N http://127.0.0.1:7788/jobs/<id>/events
 
 | Endpoint | |
 |---|---|
-| `POST /jobs` | `{"input", "output", "files"?, "kinds"?, "lang"?, "style"?, "overwrite"?, "callbackUrl"?, "onDone"?, "notify"?}` → 202 with the job |
+| `POST /jobs` | `{"input", "output", "files"?, "kinds"?, "lang"?, "style"?, "overwrite"?, "callbackUrl"?, "notify"?}` → 202 with the job (`"onDone"`, a shell command, only when the server was started with `--allow-commands`) |
 | `GET /jobs`, `GET /jobs/{id}` | The jobs, one job with every file |
 | `POST /jobs/{id}/wait?timeout=600` | Returns when the job ends |
 | `GET /jobs/{id}/events` | Server-sent events: `started`, `file`, `done` |
@@ -129,7 +129,7 @@ It listens on 127.0.0.1 only, every request needs the token, and requests sent b
 
 - **Callback:** `callbackUrl` receives a POST `{"event":"job.ended","job":{…},"summary":"…"}` with
   `X-Agent-Mask-Signature: sha256=<HMAC-SHA256 of the body, keyed with your token>`, retried on errors.
-- **Command:** `--on-done "…"` runs with `AGENT_MASK_JOB`, `AGENT_MASK_STATUS`, `AGENT_MASK_REPORT`, `AGENT_MASK_OUTPUT`.
+- **Command** (from the command line; never from an agent's tool call): `--on-done "…"` runs with `AGENT_MASK_JOB`, `AGENT_MASK_STATUS`, `AGENT_MASK_REPORT`, `AGENT_MASK_OUTPUT`.
 - **Desktop notice:** `--notify`.
 - **Files:** `report.json` appears in the output folder when the job ends.
 

@@ -15,7 +15,9 @@ func writeReports(j *Job) error {
 	if err := os.MkdirAll(j.Output, 0o755); err != nil {
 		return err
 	}
-	b, _ := json.MarshalIndent(j, "", "  ")
+	pub := *j
+	pub.Options.Callback, pub.Options.OnDone = "", ""
+	b, _ := json.MarshalIndent(&pub, "", "  ")
 	if err := os.WriteFile(filepath.Join(j.Output, "report.json"), b, 0o644); err != nil {
 		return err
 	}

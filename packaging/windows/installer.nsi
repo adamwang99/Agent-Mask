@@ -3,7 +3,7 @@ Unicode true
 Target amd64-unicode
 !define APP "Agent Mask"
 !ifndef VER
-  !define VER "0.1.2"
+  !define VER "0.1.3"
 !endif
 !define UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentMask"
 Name "${APP} ${VER}"

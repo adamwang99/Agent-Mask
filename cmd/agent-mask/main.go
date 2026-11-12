@@ -22,7 +22,7 @@ import (
 	"github.com/adamwang99/agent-mask/internal/ocr"
 )
 
-var version = "0.1.2" // set at build time: -ldflags "-X main.version=..."
+var version = "0.1.3" // set at build time: -ldflags "-X main.version=..."
 
 const help = `Agent Mask - hide sensitive text in videos and pictures, a whole folder at a time. Free.
 
@@ -34,7 +34,9 @@ const help = `Agent Mask - hide sensitive text in videos and pictures, a whole f
       Exit code: 0 all verified, 1 some file to review or failed, 2 the job could not run.
   agent-mask watch <input folder> <output folder> [options]
       the same for each file that appears in the input folder, until Ctrl+C
-  agent-mask serve [--port 7788]      local HTTP API for agents and tools (see API below)
+  agent-mask serve [--port 7788] [--allow-commands]
+                                      local HTTP API for agents and tools (see API below);
+                                      "onDone" in a request is refused without --allow-commands
   agent-mask mcp                      MCP server (stdio) for Claude Code, Codex, Cursor...
   agent-mask doctor                   check ffmpeg and tesseract
   agent-mask version
@@ -59,6 +61,7 @@ printed by serve and kept in its config folder). Listens on 127.0.0.1 only.
 
 func main() {
 	config.App = "agent-mask"
+	config.ExtendPath()
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(2)
@@ -123,10 +126,11 @@ func run(args []string) error {
 	case "serve":
 		fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 		port := fs.Int("port", 7788, "")
+		allow := fs.Bool("allow-commands", false, "")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
-		return serve(*port)
+		return serve(*port, *allow)
 	case "mcp":
 		mcpServer().ServeStdio()
 	default:

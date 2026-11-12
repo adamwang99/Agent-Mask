@@ -16,7 +16,7 @@ import (
 
 // serve: the local HTTP API. 127.0.0.1 only, a bearer token on every request (a web page in
 // the user's browser cannot read the token, so it cannot drive the API either).
-func serve(port int) error {
+func serve(port int, allowCommands bool) error {
 	token := apiToken()
 	m := batch.NewManager()
 	m.OnEnd = func(j *batch.Job) {
@@ -30,12 +30,12 @@ func serve(port int) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "Agent Mask API on http://127.0.0.1:%d\nToken: %s\n(also in %s; AGENT_MASK_TOKEN overrides it)\n", port, token, "api-token in "+configDirHint())
-	return http.Serve(ln, apiHandler(m, token))
+	return http.Serve(ln, apiHandler(m, token, allowCommands))
 }
 
 func configDirHint() string { return strings.TrimSpace(fmtConfig()) }
 
-func apiHandler(m *batch.Manager, token string) http.Handler {
+func apiHandler(m *batch.Manager, token string, allowCommands bool) http.Handler {
 	mux := http.NewServeMux()
 	reply := func(w http.ResponseWriter, code int, v any) {
 		w.Header().Set("Content-Type", "application/json")
@@ -64,6 +64,10 @@ func apiHandler(m *batch.Manager, token string) http.Handler {
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
 			fail(w, 400, err)
+			return
+		}
+		if req.OnDone != "" && !allowCommands {
+			fail(w, 400, fmt.Errorf("onDone runs a shell command: start the server with --allow-commands to accept it"))
 			return
 		}
 		if req.Callback != "" && !strings.HasPrefix(req.Callback, "http://") && !strings.HasPrefix(req.Callback, "https://") {

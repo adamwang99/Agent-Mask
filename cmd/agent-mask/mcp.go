@@ -26,7 +26,9 @@ func nArg(a map[string]any, k string, def float64) float64 {
 }
 
 func optionsFrom(a map[string]any) batch.Options {
-	o := batch.Options{Lang: sArg(a, "lang"), Style: sArg(a, "style"), Callback: sArg(a, "callbackUrl"), OnDone: sArg(a, "onDone")}
+	// No command and no callback from an agent: it is told by job_wait, and a tool argument
+	// must never become a shell command or an outbound request.
+	o := batch.Options{Lang: sArg(a, "lang"), Style: sArg(a, "style")}
 	if k := sArg(a, "kinds"); k != "" {
 		o.Kinds = strings.Split(k, ",")
 	}
@@ -81,12 +83,11 @@ func mcpServer() *mcp.Server {
 	m := batch.NewManager()
 	m.OnEnd = func(j *batch.Job) { batch.Notify(j, apiToken()) }
 	common := map[string]any{
-		"kinds":       str("Comma-separated kinds to hide (default all): email, phone, api-key, jwt, private-key, credit-card, secret-assignment, url-credentials, high-entropy."),
-		"lang":        str("OCR languages: eng (default) or vie+eng."),
-		"style":       str("auto (default), soft, mosaic, blur, solid."),
-		"overwrite":   map[string]any{"type": "boolean", "description": "Redo files already done."},
-		"callbackUrl": str("POSTed the job's result when it ends (signed with X-Agent-Mask-Signature)."),
-		"notify":      map[string]any{"type": "boolean", "description": "Show a desktop notice when it ends."},
+		"kinds":     str("Comma-separated kinds to hide (default all): email, phone, api-key, jwt, private-key, credit-card, secret-assignment, url-credentials, high-entropy."),
+		"lang":      str("OCR languages: eng (default) or vie+eng."),
+		"style":     str("auto (default), soft, mosaic, blur, solid."),
+		"overwrite": map[string]any{"type": "boolean", "description": "Redo files already done."},
+		"notify":    map[string]any{"type": "boolean", "description": "Show a desktop notice when it ends."},
 	}
 	with := func(extra map[string]any) map[string]any {
 		out := map[string]any{}

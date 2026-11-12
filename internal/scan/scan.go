@@ -99,6 +99,11 @@ type Options struct {
 	BigChange   float64  // share of blocks that makes a change "big", default 0.004
 	RefreshSec  float64  // any change is read within this, default 1
 	Crop        *Crop    // scan only this part (the window of a framed video)
+	// Check: this scan checks a masked output. It looks at the frames halfway between the
+	// frames a first scan looks at, so it tests the masks where they were worked out from the
+	// scroll, not where the text was read: a check on the same frames would only repeat what
+	// the first scan saw.
+	Check bool
 }
 
 // Result of a scan.
@@ -161,8 +166,12 @@ func Video(video string, o Options) (*Result, error) {
 		vfps = 30
 	}
 	every := max(1, int(math.Round(vfps/o.LookFPS)))
+	phase := 0
+	if o.Check {
+		phase = every / 2
+	}
 	cmd := exec.Command("ffmpeg", "-v", "error", "-i", video,
-		"-vf", fmt.Sprintf("%ssetpts=PTS-STARTPTS,fps=%g,select='not(mod(n\\,%d))',scale=%d:%d:flags=area,format=gray", cropFilter, vfps, every, w, h),
+		"-vf", fmt.Sprintf("%ssetpts=PTS-STARTPTS,fps=%g,select='gte(n\\,%d)*not(mod(n-%d\\,%d))',scale=%d:%d:flags=area,format=gray", cropFilter, vfps, phase, phase, every, w, h),
 		"-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "-")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -232,7 +241,7 @@ func Video(video string, o Options) (*Result, error) {
 		if _, err := io.ReadFull(r, gray); err != nil {
 			break
 		}
-		t := float64(n*every) / vfps
+		t := float64(n*every+phase) / vfps
 		means := BlockMeans(gray, w, h)
 		// Compared with the last frame read: a big change (a scroll, a new window) is read now;
 		// any change at all, down to one block (a code appearing, a typed character), within

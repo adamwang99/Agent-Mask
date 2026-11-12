@@ -82,6 +82,7 @@ func Video(in, out string, o Options) (*Result, error) {
 	if err := media.Render(media.Request{Input: in, Output: out, Info: info, BoxesAt: BoxesAt(found.Regions, o.Style), Style: o.Style}); err != nil {
 		return nil, err
 	}
+	so.Check = true
 	check, err := scan.Video(out, so)
 	if err != nil {
 		return nil, err

@@ -102,6 +102,7 @@ func redactImage(in, out string, o Options) (*FileReport, error) {
 	if err != nil {
 		return nil, err
 	}
+	so.Check = true
 	check, err := scan.Video(checkClip, so)
 	if err != nil {
 		return nil, err

@@ -47,13 +47,23 @@ func (s *Server) call(name string, args map[string]any) map[string]any {
 		if t.Name != name {
 			continue
 		}
-		r, err := t.Call(args)
-		if err != nil {
-			return text(err.Error(), true)
-		}
-		return text(r, false)
+		return s.run(t, args)
 	}
 	return text("Unknown tool "+name, true)
+}
+
+// run calls a tool; a panic in it is that call's error, never the end of the server.
+func (s *Server) run(t Tool, args map[string]any) (res map[string]any) {
+	defer func() {
+		if p := recover(); p != nil {
+			res = text(fmt.Sprintf("internal error in %s: %v", t.Name, p), true)
+		}
+	}()
+	r, err := t.Call(args)
+	if err != nil {
+		return text(err.Error(), true)
+	}
+	return text(r, false)
 }
 
 func (s *Server) handle(req request) (any, *rpcError) {

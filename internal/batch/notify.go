@@ -2,6 +2,7 @@ package batch
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -24,6 +25,7 @@ func Notify(j *Job, secret string) []string {
 	if u := j.Options.Callback; u != "" {
 		summary := *j
 		summary.Files = nil
+		summary.Options.Callback, summary.Options.OnDone = "", ""
 		body, _ := json.Marshal(map[string]any{"event": "job.ended", "job": summary, "summary": Summary(j)})
 		req, err := http.NewRequest("POST", u, bytes.NewReader(body))
 		if err == nil {
@@ -58,7 +60,10 @@ func Notify(j *Job, secret string) []string {
 		}
 	}
 	if c := j.Options.OnDone; c != "" {
-		cmd := shell(c)
+		// At most 5 minutes: jobs run one after another, a hung command must not hold the queue.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		cmd := shell(ctx, c)
 		cmd.Env = append(os.Environ(), "AGENT_MASK_JOB="+j.ID, "AGENT_MASK_REPORT="+j.Report, "AGENT_MASK_STATUS="+j.Status, "AGENT_MASK_OUTPUT="+j.Output)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			problems = append(problems, fmt.Sprintf("onDone: %v %s", err, strings.TrimSpace(string(out))))
@@ -70,11 +75,11 @@ func Notify(j *Job, secret string) []string {
 	return problems
 }
 
-func shell(c string) *exec.Cmd {
+func shell(ctx context.Context, c string) *exec.Cmd {
 	if runtime.GOOS == "windows" {
-		return exec.Command("cmd", "/C", c)
+		return exec.CommandContext(ctx, "cmd", "/C", c)
 	}
-	return exec.Command("sh", "-c", c)
+	return exec.CommandContext(ctx, "sh", "-c", c)
 }
 
 // Desktop shows a notice the OS's own way; best effort.

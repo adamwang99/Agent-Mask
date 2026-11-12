@@ -27,9 +27,11 @@ type Options struct {
 	Lang      string   `json:"lang,omitempty"`  // tesseract languages, default eng
 	Style     string   `json:"style,omitempty"` // auto, soft, mosaic, blur, solid...
 	Overwrite bool     `json:"overwrite,omitempty"`
-	Callback  string   `json:"callbackUrl,omitempty"` // POSTed the job when it ends
-	OnDone    string   `json:"onDone,omitempty"`      // a command run when it ends
-	Notify    bool     `json:"notify,omitempty"`      // a desktop notice when it ends
+	// Callback and OnDone are never written to the report (a webhook URL can carry a secret,
+	// and the report sits in a folder meant to be shared).
+	Callback string `json:"callbackUrl,omitempty"` // POSTed the job when it ends
+	OnDone   string `json:"onDone,omitempty"`      // a command run when it ends (command line only)
+	Notify   bool   `json:"notify,omitempty"`      // a desktop notice when it ends
 }
 
 // Video and picture extensions read.
@@ -56,6 +58,7 @@ type FileReport struct {
 	Error    string          `json:"error,omitempty"`
 	Seconds  float64         `json:"seconds"`
 	rel      string
+	outRel   string
 }
 
 // Job is one folder.
@@ -176,6 +179,10 @@ func (m *Manager) Start(in, out string, o Options) (*Job, error) {
 
 // StartFiles queues a job for some files of a folder (watch mode: the new ones).
 func (m *Manager) StartFiles(in, out string, files []string, o Options) (*Job, error) {
+	return m.startFiles(in, out, files, o, false)
+}
+
+func (m *Manager) startFiles(in, out string, files []string, o Options, skipMissing bool) (*Job, error) {
 	in, out, err := Check(in, out)
 	if err != nil {
 		return nil, err
@@ -194,6 +201,9 @@ func (m *Manager) StartFiles(in, out string, files []string, o Options) (*Job, e
 			return nil, fmt.Errorf("%s is not a video or picture", f)
 		}
 		if _, err := os.Stat(f); err != nil {
+			if skipMissing {
+				continue
+			}
 			return nil, err
 		}
 		list = append(list, f)
@@ -209,22 +219,24 @@ func (m *Manager) queueFiles(in, out string, files []string, o Options) (*Job, e
 		o.Lang = "eng"
 	}
 	j := &Job{ID: newID(), Input: in, Output: out, Options: o, Status: "queued", Created: time.Now().UTC()}
+	taken := map[string]bool{}
 	for _, f := range files {
 		rel, _ := filepath.Rel(in, f)
 		t := "video"
 		if ImageExts[strings.ToLower(filepath.Ext(f))] {
 			t = "image"
 		}
-		j.Files = append(j.Files, &FileReport{Input: f, Type: t, Status: "pending", rel: rel})
+		j.Files = append(j.Files, &FileReport{Input: f, Type: t, Status: "pending", rel: rel, outRel: outName(rel, t, taken)})
 	}
 	j.Counts.Total = len(j.Files)
 	m.mu.Lock()
 	m.jobs[j.ID] = j
 	m.order = append(m.order, j.ID)
 	m.mu.Unlock()
+	first := j.copy() // the caller's own copy: the worker writes to j from now on
 	m.once.Do(func() { go m.worker() })
 	m.queue <- j
-	return j, nil
+	return first, nil
 }
 
 // Get a copy of a job (safe to read while it runs).
@@ -436,19 +448,20 @@ func (m *Manager) run(j *Job) {
 
 // one processes one file.
 func (m *Manager) one(j *Job, f *FileReport, idx *index) *FileReport {
-	r := &FileReport{Input: f.Input, Type: f.Type, rel: f.rel}
+	r := &FileReport{Input: f.Input, Type: f.Type, rel: f.rel, outRel: f.outRel}
 	t0 := time.Now()
 	defer func() { r.Seconds = float64(time.Since(t0).Milliseconds()) / 1000 }()
-	outRel := f.rel
-	if f.Type == "video" {
-		outRel = strings.TrimSuffix(outRel, filepath.Ext(outRel)) + ".mp4"
-	} else {
-		outRel = ImageOut(outRel)
-	}
+	outRel := f.outRel
 	key := idx.key(f.Input, j.Options)
 	if prev, ok := idx.Done[f.rel]; ok && prev.Key == key && !j.Options.Overwrite {
 		if _, err := os.Stat(filepath.Join(j.Output, prev.Output)); err == nil {
-			r.Status, r.Output, r.Verified = "skipped", filepath.Join(j.Output, prev.Output), prev.Verified
+			r.Output, r.Verified = filepath.Join(j.Output, prev.Output), prev.Verified
+			r.Status = "skipped"
+			// Unchanged, but it was not verified last time either: it still needs a look.
+			if !prev.Verified {
+				r.Status = "review"
+				r.Reasons = []string{"unchanged since the last run, where it was not verified: still in " + ReviewDir + "/"}
+			}
 			return r
 		}
 	}
@@ -490,6 +503,22 @@ func (m *Manager) one(j *Job, f *FileReport, idx *index) *FileReport {
 	r.Output = full
 	idx.Done[f.rel] = indexEntry{Key: key, Output: dest, Verified: r.Verified}
 	return r
+}
+
+// outName: the output name of an input, unique in the job: "a.mov" and "a.mp4" both become
+// videos named a.mp4, so the second keeps its own extension in the name (a.mov.mp4).
+func outName(rel, typ string, taken map[string]bool) string {
+	out := ImageOut(rel)
+	if typ == "video" {
+		out = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".mp4"
+	}
+	key := strings.ToLower(out)
+	if taken[key] {
+		out = rel + filepath.Ext(out)
+		key = strings.ToLower(out)
+	}
+	taken[key] = true
+	return out
 }
 
 func redactVideo(in, out string, o Options) (*FileReport, error) {

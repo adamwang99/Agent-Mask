@@ -195,7 +195,8 @@ func Render(r Request) error {
 		graphArgs = []string{graphFileOption(), gf}
 	}
 	args = append(args, graphArgs...)
-	args = append(args, "-map", "[out]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+	// No metadata is carried over: a title, a location or a device name can be sensitive too.
+	args = append(args, "-map", "[out]", "-map", "0:a?", "-map_metadata", "-1", "-map_chapters", "-1", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
 		"-tune", "stillimage", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", r.Output)
 	cmd := exec.Command("ffmpeg", args...)
 	stdin, err := cmd.StdinPipe()

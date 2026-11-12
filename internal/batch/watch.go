@@ -41,7 +41,8 @@ func (m *Manager) Watch(ctx context.Context, in, out string, o Options, every ti
 			ready = append(ready, f)
 		}
 		if len(ready) > 0 {
-			if j, err := m.StartFiles(in, out, ready, o); err == nil && started != nil {
+			// A file that vanished since the look is skipped; the others still go.
+			if j, err := m.startFiles(in, out, ready, o, true); err == nil && started != nil {
 				started(j)
 			}
 		}

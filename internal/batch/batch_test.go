@@ -113,3 +113,37 @@ func TestCancelQueuedJob(t *testing.T) {
 		t.Fatalf("second job: %+v", j)
 	}
 }
+
+func TestOutputNamesDoNotCollide(t *testing.T) {
+	taken := map[string]bool{}
+	a := outName("clip.mov", "video", taken)
+	b := outName("clip.mp4", "video", taken)
+	c := outName("sub/clip.mp4", "video", taken)
+	d := outName("pic.bmp", "image", taken)
+	e := outName("pic.png", "image", taken)
+	if a != "clip.mp4" || b != "clip.mp4.mp4" || c != "sub/clip.mp4" || d != "pic.png" || e != "pic.png.png" {
+		t.Fatal(a, b, c, d, e)
+	}
+}
+
+// A file that was not verified stays "review" on the next run: a rerun must not look clean.
+func TestRerunKeepsReview(t *testing.T) {
+	in, out := t.TempDir(), t.TempDir()
+	f := filepath.Join(in, "a.png")
+	os.WriteFile(f, []byte("x"), 0o644)
+	os.MkdirAll(filepath.Join(out, ReviewDir), 0o755)
+	os.WriteFile(filepath.Join(out, ReviewDir, "a.png"), []byte("x"), 0o644)
+	idx := loadIndex(out)
+	o := Options{Lang: "eng", Style: "auto"}
+	idx.Done["a.png"] = indexEntry{Key: idx.key(f, o), Output: filepath.Join(ReviewDir, "a.png"), Verified: false}
+	idx.save(out)
+	m := NewManager()
+	j, err := m.Start(in, out, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, _ = m.Wait(j.ID, time.Minute)
+	if j.Counts.Review != 1 || j.Counts.Skipped != 0 || j.Files[0].Status != "review" {
+		t.Fatalf("%+v %+v", j.Counts, j.Files[0])
+	}
+}
