@@ -112,6 +112,46 @@ func FoldOCR(text string) string {
 // "jane.doegexample.com" (an address) from "logging.info" (code).
 var emailTLDs = map[string]bool{"com": true, "net": true, "org": true, "io": true, "vn": true, "co": true, "dev": true, "ai": true, "edu": true, "gov": true, "me": true, "app": true, "uk": true, "us": true, "de": true, "fr": true, "jp": true, "kr": true, "cn": true, "au": true, "ca": true, "in": true, "sg": true, "biz": true}
 
+// Generic top-level domains longer than two letters that addresses use. Any two-letter ending
+// is a country and passes; a longer one must be a real domain: OCR reads a row of taskbar icons
+// as "F@QAC.CHOEIECES" or "SG@QRO.nhat", and those are not addresses.
+var genericTLDs = map[string]bool{"com": true, "net": true, "org": true, "edu": true, "gov": true, "mil": true, "int": true, "biz": true, "info": true, "name": true, "pro": true, "mobi": true, "asia": true, "tel": true, "travel": true, "jobs": true, "aero": true, "coop": true, "museum": true, "cat": true, "post": true, "xxx": true, "app": true, "dev": true, "page": true, "xyz": true, "tech": true, "online": true, "site": true, "store": true, "shop": true, "cloud": true, "email": true, "mail": true, "live": true, "blog": true, "work": true, "company": true, "agency": true, "digital": true, "media": true, "studio": true, "design": true, "solutions": true, "services": true, "systems": true, "network": true, "group": true, "global": true, "world": true, "team": true, "space": true, "life": true, "news": true, "today": true, "academy": true, "school": true, "university": true, "health": true, "finance": true, "bank": true, "law": true, "art": true, "fun": true, "top": true, "club": true, "one": true, "ltd": true, "llc": true, "inc": true, "local": true, "internal": true, "corp": true, "test": true, "example": true}
+
+// findEmails: addresses ending with a real top-level domain. A match whose last label is not
+// one is cut back to the last label that is ("jane@example.com.Then" -> "jane@example.com").
+func findEmails(text string, out *[]byteSpan) {
+	for _, loc := range reEmail.FindAllStringIndex(text, -1) {
+		m := text[loc[0]:loc[1]]
+		at := strings.IndexByte(m, '@')
+		for end := len(m); end > at; {
+			dot := strings.LastIndexByte(m[:end], '.')
+			if dot <= at {
+				break
+			}
+			if tld := m[dot+1 : end]; countryTLD(tld) || genericTLDs[strings.ToLower(tld)] {
+				*out = append(*out, byteSpan{"email", loc[0], loc[0] + end})
+				break
+			}
+			end = dot
+		}
+	}
+}
+
+// countryTLD: two letters of one case ("vn", "DE"). A mixed-case pair is OCR reading icons:
+// the taskbar comes out as "S@QACr.cH", and nobody writes an address ending in ".cH".
+func countryTLD(tld string) bool {
+	return len(tld) == 2 && isLetters(tld) && (tld == strings.ToLower(tld) || tld == strings.ToUpper(tld))
+}
+
+func isLetters(s string) bool {
+	for _, r := range s {
+		if !unicode.IsLetter(r) {
+			return false
+		}
+	}
+	return true
+}
+
 // byteSpan is a finding in byte offsets, converted to runes at the end.
 type byteSpan struct {
 	kind       string
@@ -365,7 +405,7 @@ func Find(text string, kinds []string) []Match {
 		}
 	}
 	if on["email"] {
-		collect(text, reEmail, "email", &out, nil, 0)
+		findEmails(text, &out)
 		findLostAtEmails(text, &out)
 		findSpacedEmails(text, &out)
 	}
@@ -412,7 +452,7 @@ func MaskedPreview(value string) string {
 }
 
 // findAllGuarded: the submatch indexes of every match not preceded by a letter or digit
-// (the lookbehind RE2 lacks).
+// (the lookbehind the Node version has).
 func findAllGuarded(text string, re *regexp.Regexp) [][]int {
 	var out [][]int
 	for pos := 0; pos < len(text); {

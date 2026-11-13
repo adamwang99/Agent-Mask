@@ -3,6 +3,7 @@ package scan
 import (
 	"fmt"
 	"math"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -123,5 +124,34 @@ func TestMeasureMotionFastScrollAndJump(t *testing.T) {
 	jumps := m.Jumps(nil)
 	if len(jumps) != 2 || jumps[0] < 120 || jumps[0] > 122 || jumps[1] < 135 || jumps[1] > 137 {
 		t.Errorf("jump frames %v, want one near 121 and one near 136", jumps)
+	}
+}
+
+// A real recording (docs/test-data/02-raw.mp4, fake secrets): a text page, a focus ring drawn
+// after the first frame, a fast scroll of several lines a frame, then a jump back to the top.
+// Measured against the first frame alone the fast scroll passed for no scroll: the card number
+// was left unmasked at 11.8 s and every mask stayed fixed on the screen. The card line is at
+// 29% of the height on frame 0 and at 2.6% on frame 354; on frame 900 the page is back where it
+// was on frame 349.
+func TestMeasureMotionFollowsAFastScrollOfText(t *testing.T) {
+	video := filepath.Join("..", "..", "docs", "test-data", "02-raw.mp4")
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("no ffmpeg")
+	}
+	if _, err := os.Stat(video); err != nil {
+		t.Skip("no test recording")
+	}
+	m, err := MeasureMotion(video, "", 1920, 1080, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Shift[354] - m.Shift[0]; math.Abs(got-0.264) > 0.015 {
+		t.Errorf("frame 354: scrolled %.3f of the height, want 0.264", got)
+	}
+	if got := m.Shift[900] - m.Shift[349]; math.Abs(got) > 0.01 {
+		t.Errorf("frame 900: %.3f of the height from the top of the page, want 0", got)
+	}
+	if m.Scene[900] != m.Scene[0] {
+		t.Errorf("a scroll was taken for a new scene")
 	}
 }

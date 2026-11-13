@@ -186,6 +186,15 @@ type Track struct {
 	EndSec   float64 `json:"endSec"`   // last on screen
 	OnScreen []Span  `json:"onScreen"` // each stretch on screen: a page scrolls away and comes back
 	Box      Box     `json:"box"`
+	// Sightings: the frames where OCR itself read the text, with where it read it. The other
+	// points are worked out from these (pixels, scroll); a reviewer checks these first.
+	Sightings []Sighting `json:"sightings,omitempty"`
+}
+
+// Sighting is one OCR read of a track: second of the video, and box on that frame.
+type Sighting struct {
+	T   float64 `json:"t"`
+	Box Box     `json:"box"`
 }
 
 // Span is a stretch of time.
@@ -318,10 +327,14 @@ func FinalizeTracks(tracks []*Track, times []float64, durationSec float64) []*Tr
 		pts := append([]Point(nil), tr.Points...)
 		sort.SliceStable(pts, func(i, j int) bool { return pts[i].T < pts[j].T })
 		var box Box
+		var seen []Sighting
 		first := true
 		for _, p := range pts {
 			if p.Off {
 				continue
+			}
+			if !p.Propagated {
+				seen = append(seen, Sighting{T: p.T, Box: p.Box})
 			}
 			if first {
 				box, first = p.Box, false
@@ -356,7 +369,7 @@ func FinalizeTracks(tracks []*Track, times []float64, durationSec float64) []*Tr
 			spans = []Span{{StartSec: pts[0].T, EndSec: pts[0].T}}
 		}
 		out = append(out, &Track{Kind: tr.Kind, Preview: preview, Text: tr.Text, Points: pts,
-			StartSec: spans[0].StartSec, EndSec: spans[len(spans)-1].EndSec, OnScreen: spans, Box: box})
+			StartSec: spans[0].StartSec, EndSec: spans[len(spans)-1].EndSec, OnScreen: spans, Box: box, Sightings: seen})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].StartSec < out[j].StartSec })
 	for i, tr := range out {

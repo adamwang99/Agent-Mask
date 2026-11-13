@@ -337,23 +337,28 @@ func Video(video string, o Options) (*Result, error) {
 	sort.SliceStable(samples, func(i, j int) bool { return samples[i].TimeSec < samples[j].TimeSec })
 	tw, th := w>>1, h>>1
 	linked := plan.LinkTracks(samples, 0)
-	plan.Propagate(linked, keys, tw, th, 0)
-	// The surface each hidden box sits on, for the soft fill.
-	keyOfTime := map[float64]int{}
-	for i, k := range keys {
-		for _, t := range k.Times {
-			keyOfTime[t] = i
-		}
-	}
-	for _, tr := range linked {
-		for i := range tr.Points {
-			if k, ok := keyOfTime[tr.Points[i].T]; ok {
-				tr.Points[i].Bg = plan.BgAround(keys[k].Thumb, tw, th, tr.Points[i].Box)
+	// A check reports what OCR read on the output's own frames, where it read it. Following a
+	// read by its pixels or by the scroll is for placing masks: on a zoomed output the zoom looks
+	// like a scroll, and one read was spread over places it never was.
+	if !o.Check {
+		plan.Propagate(linked, keys, tw, th, 0)
+		// The surface each hidden box sits on, for the soft fill.
+		keyOfTime := map[float64]int{}
+		for i, k := range keys {
+			for _, t := range k.Times {
+				keyOfTime[t] = i
 			}
 		}
-	}
-	if motion != nil {
-		linked = plan.FollowScroll(linked, motion.Shift, motion.Scene, motion.FPS)
+		for _, tr := range linked {
+			for i := range tr.Points {
+				if k, ok := keyOfTime[tr.Points[i].T]; ok {
+					tr.Points[i].Bg = plan.BgAround(keys[k].Thumb, tw, th, tr.Points[i].Box)
+				}
+			}
+		}
+		if motion != nil {
+			linked = plan.FollowScroll(linked, motion.Shift, motion.Scene, motion.FPS)
+		}
 	}
 	sort.Float64s(times)
 	res.Regions = plan.FinalizeTracks(linked, times, info.DurationSec)

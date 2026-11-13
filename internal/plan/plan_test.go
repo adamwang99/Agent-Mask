@@ -209,3 +209,21 @@ func TestFollowScrollTwoPlaces(t *testing.T) {
 		}
 	}
 }
+
+// Sightings list only the frames OCR read, not the points worked out from them.
+func TestSightingsAreTheReads(t *testing.T) {
+	shift := make([]float64, 60)
+	scene := make([]int, 60)
+	for f := range shift {
+		shift[f] = 0.01 * float64(f)
+	}
+	tr := &Track{Kind: "email", Points: []Point{{T: 1.0, Box: Box{X0: 0.1, Y0: 0.6, X1: 0.5, Y1: 0.63}}}}
+	tracks := FinalizeTracks(FollowScroll([]*Track{tr}, shift, scene, 30), []float64{1}, 2)
+	if len(tracks) != 1 || len(tracks[0].Points) < 2 {
+		t.Fatalf("want one followed track, got %+v", tracks)
+	}
+	s := tracks[0].Sightings
+	if len(s) != 1 || s[0].T != 1.0 || s[0].Box.Y0 != 0.6 {
+		t.Fatalf("sightings %+v, want the one read at 1.0 s, y 0.6", s)
+	}
+}

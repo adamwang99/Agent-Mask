@@ -119,6 +119,20 @@ func TestMaskedPreview(t *testing.T) {
 	}
 }
 
+// OCR reads a row of taskbar icons as "F@QAC.CHOEIECES": an address must end with a real
+// top-level domain. Real addresses still do, whatever their case or country.
+func TestEmailNeedsARealTLD(t *testing.T) {
+	email := []string{"email"}
+	eq(t, hits("an| =~@ech2aan — F@QAC.CHOEIECES", email), [][2]string{})
+	eq(t, hits("xem|fh“SG@QRO.nhat kw trite. CHOICE", email), [][2]string{})
+	eq(t, hits("lQĐọc „bảng©điều;ñkhiển mm —pntof, S@QACr.cH TICE", email), [][2]string{})
+	for _, addr := range []string{"jane.doe@example.com", "JANE@EXAMPLE.COM", "an@fpt.com.vn", "ops@acme.info", "hi@studio.design", "x@y.de", "dev@corp.internal", "SALES@ACME.VN"} {
+		eq(t, hits("Contact: "+addr+" today", email), [][2]string{{"email", addr}})
+	}
+	// A sentence glued to the address by OCR keeps the address.
+	eq(t, hits("mail jane@example.com.Then call", email), [][2]string{{"email", "jane@example.com"}})
+}
+
 // The detector finds exactly the expected matches on a corpus of lines (testdata/expected.json,
 // from the reference implementation). A Stripe-shaped test key is put together here, not stored,
 // so the repository holds nothing a secret scanner would take for a real key.
