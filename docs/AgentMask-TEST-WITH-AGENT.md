@@ -6,7 +6,7 @@ macOS hoặc Linux nếu có. Chỉ dùng **dữ liệu giả**: không đưa b�
 ## Chuẩn bị (người làm, trước khi giao cho agent)
 
 1. Cài Agent Mask, chọn một trong hai cách:
-   - Windows: chạy `AgentMask-Setup-0.1.3.exe`. Bộ cài chưa ký số, SmartScreen có thể hỏi: bấm **More info → Run anyway**. Ở trang cuối, để tick "Check and install ffmpeg and Tesseract" và trả lời Y.
+   - Windows: chạy `AgentMask-Setup-0.1.4.exe`. Bộ cài chưa ký số, SmartScreen có thể hỏi: bấm **More info → Run anyway**. Ở trang cuối, để tick "Check and install ffmpeg and Tesseract" và trả lời Y.
    - Có Go 1.24+: `go install github.com/adamwang99/agent-mask/cmd/agent-mask@latest`, rồi tự cài ffmpeg và Tesseract (Windows: `winget install Gyan.FFmpeg` và `winget install UB-Mannheim.TesseractOCR`; macOS: `brew install ffmpeg tesseract`; Linux: `sudo apt install ffmpeg tesseract-ocr`).
 2. Nối MCP cho agent:
    - Claude Code: `claude mcp add agent-mask -- agent-mask mcp`
@@ -118,7 +118,7 @@ Hãy kiểm thử ứng dụng Agent Mask trên máy này và viết báo cáo. 
 - So sánh thời gian xử lý với lần trước (85,2 giây cho 59 giây video).
 
 **10. Trình diễn cho anh Adam**
-- Ghép `AgentMask-0.1.3-showcase.mp4` dài 1–2 phút bằng ffmpeg. Mỗi đoạn 5–15 giây, có thẻ tiêu đề tiếng Việt 2 giây đặt trước:
+- Ghép `AgentMask-0.1.4-showcase.mp4` dài 1–2 phút bằng ffmpeg. Mỗi đoạn 5–15 giây, có thẻ tiêu đề tiếng Việt 2 giây đặt trước:
   1. Cả thư mục trước khi che (lưới ảnh các file vào).
   2. Lệnh `batch` chạy trong terminal (quay màn hình).
   3. Ảnh trước/sau đặt cạnh nhau.
